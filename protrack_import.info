@@ -1,0 +1,26 @@
+; $Id:$
+name = ProTrack Import
+description = Import Module for ProTrack program data.
+package = KUED Modules
+core = 7.x
+files[] = protrack_import.install
+files[] = protrack_import.module
+files[] = protrack_import.functions.inc
+files[] = protrack_import.series.functions.inc
+files[] = protrack_import.episode.functions.inc
+
+dependencies[] = node
+dependencies[] = field
+dependencies[] = number
+dependencies[] = taxonomy
+dependencies[] = references
+dependencies[] = entity
+dependencies[] = entityreference
+dependencies[] = cer
+;dependencies[] = pathauto
+
+; Information added by drupal.org packaging script on 2011-01-12
+version = "7.x-1.0-dev"
+core = "7.x"
+project = "protrack_import"
+datestamp = "1294805790"

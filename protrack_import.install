@@ -1,0 +1,36 @@
+<?php
+//delete from  `drupal7`.`system` where name like 'pressrelease'
+function protrack_import_schema() {
+	$schema['protrack_series'] = array(
+    'description' => t('Protrack Series table.'),
+    'fields' => array(
+      'series_id' => array(
+        'description' => t('Series ID.'),
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE),
+      'series_code' => array(
+        'description' => t('Code of the Series.'),
+        'type' => 'varchar',
+        'length' => 8),
+      'series_title' => array(
+        'description' => t('Title of the Series.'),
+        'type' => 'varchar',
+        'length' => 220),
+      'series_description' => array(
+        'description' => t('Series description.'),
+        'type' => 'text'),
+      'series_url' => array(
+        'description' => t('Series URL.'),
+        'type' => 'text'),
+      'series_pgm_type' => array(
+        'description' => t('Series program type'),
+        'type' => 'varchar',
+        'length' => 15),
+      ),
+    'primary key' => array('series_id'),
+    );
+
+
+	return $schema;
+}

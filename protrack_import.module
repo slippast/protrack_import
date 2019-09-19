@@ -1,0 +1,2172 @@
+<?php
+// $Id$
+
+/**
+* Implements hook_menu().
+*/
+function protrack_import_menu() {
+  $items = array(); 
+
+  $items['admin/config/content/kued/protrack_import'] = array(
+    'title' => 'ProTrack Import',
+    'description' => 'Allows users to import ProTrack data.',
+    'page callback' => 'protrack_import_admin',
+    //'page arguments' => 'protrack_import_admin',
+    'access arguments' => array('administer protrack'),
+    'type' => MENU_NORMAL_ITEM,
+		'access callback' => TRUE,
+    'expanded' => TRUE,
+  );
+  $items['admin/config/content/kued/protrack_import/series'] = array(
+    'title' => 'Series Import',
+    'description' => 'Allows users to import ProTrack Series data.',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('series_protrack_import_form'),
+    'access arguments' => array('administer protrack'),
+		//'tab_root' => 'admin/config/content/kued/protrack_import/series',
+    //'tab_parent' => 'admin/config/content/kued/protrack_import/',
+		'type' => MENU_LOCAL_TASK,
+    'weight' => 5,
+  );
+  $items['admin/config/content/kued/protrack_import/episode'] = array(
+    'title' => 'Episode Import',
+    'description' => 'Allows users to import ProTrack Episode data.',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('episode_protrack_import_form'),
+    'access arguments' => array('administer protrack'),
+		//'tab_root' => 'admin/config/content/kued/protrack_import/episode',
+		//'tab_parent' => 'admin/config/content/kued/protrack_import/',
+		'type' => MENU_LOCAL_TASK,
+    'weight' => 6,
+  );
+  $items['admin/config/content/kued/protrack_import/airlist'] = array(
+    'title' => 'Airlist Import',
+    'description' => 'Allows users to import ProTrack Airlist data.',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('airlist_protrack_import_form'),
+    'access arguments' => array('administer protrack'),
+		//'tab_root' => 'admin/config/content/kued/protrack_import/airlist',
+    //'tab_parent' => 'admin/config/content/kued/protrack_import/',
+		'type' => MENU_LOCAL_TASK,
+    'weight' => 7,
+  );
+
+  $items['admin/config/content/kued/protrack_import/airdates'] = array(
+    'title' => 'Airdate Connect',
+    'description' => 'Connect up the ProTrack airdates and the active nodes.',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('airdates_protrack_import_form'),
+    'access arguments' => array('administer protrack'),
+		'type' => MENU_LOCAL_TASK,
+    'weight' => 8,
+  );
+
+  $items['admin/config/content/kued/protrack_import/publish'] = array(
+    'title' => 'Publish Check',
+    'description' => 'Publication fixer.',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('publish_protrack_import_form'),
+    'access arguments' => array('administer protrack'),
+		'type' => MENU_LOCAL_TASK,
+    'weight' => 9,
+  );
+
+/*
+  $items['admin/config/content/kued/protrack_import/airlist'] = array(
+    'title' => 'ProTrack Airlist Import',
+    'description' => 'Allows users to import ProTrack Airlist data.',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('airlist_protrack_import_form'),
+    'access arguments' => array('access administration pages'),
+    'tab_root' => 'admin/config/content/kued/protrack_import/airlist',
+    'tab_parent' => 'admin/config/content/kued/protrack_import/',
+		'type' => MENU_NORMAL_ITEM,
+  );
+*/
+
+  $items['admin/config/content/kued/protrack_import/status'] = array(
+    'title' => 'Import Reset',
+    'description' => 'Check the status and reset the last ProTrack Import.',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('status_protrack_import_form'),
+    'access arguments' => array('administer protrack'),
+		'type' => MENU_LOCAL_TASK,
+    'weight' => 1,
+  );
+  $items['admin/config/content/kued/protrack_import/history'] = array(
+    'title' => 'Import History',
+    'description' => 'Show the last 10 ProTrack Imports (newest first).',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('history_protrack_import_form'),
+    'access arguments' => array('administer protrack'),
+		'type' => MENU_LOCAL_TASK,
+    'weight' => 0,
+  );
+
+  return $items;
+}
+
+
+/**
+ * Implements hook_permission().
+ */
+function protrack_import_permission() {
+  return array(
+    'administer protrack' => array(
+      'title' => t('Administer ProTrack Imports'),
+      'description' => t('Perform manual ProTrack Imports and view automation history.'),
+    ),
+  );
+}
+
+
+// Form to display the last run ProTrack Import
+function history_protrack_import_form(){
+	$form['status_protrack'] = array(
+	  '#type' => 'fieldset',
+	  '#title' => t('ProTrack Import History'),
+	  '#weight' => 5,
+	  '#collapsible' => FALSE,
+	  '#collapsed' => FALSE,	
+	);
+
+	// Names of the physical files that will be imported
+	$file_name_array = array('airlist', 'series', 'episode');
+	// Path to the files
+	$file_path = drupal_realpath('private://');
+		// Go through each filetype
+		foreach($file_name_array as $file) {
+		//$file_path = drupal_realpath('private://');
+		$file_name = file_create_url($file_path . '/' . $file . '.txt');
+		// Check to see if the file exists.
+			if (file_exists($file_name)) {
+				// Find out when the file on the server was last modified
+				$file_mod_time_unix = filemtime($file_name);
+				$file_mod_time_human = format_date(filemtime($file_name), 'long');
+				
+				$file_details[$file] = $file_mod_time_human;
+			}
+		}
+
+	// Provide some details
+	$form['status_protrack']['file_details'] = array(
+		'#markup' => t('<strong>ProTrack files updated</strong>:<br /><ul><li><strong>Airlist</strong>: %airlist</li><li><strong>Series</strong>: %series</li><li><strong>Episode</strong>: %episode</li></ul><hr />', array('%airlist' => $file_details['airlist'], '%series' => $file_details['series'], '%episode' => $file_details['episode'])),
+	);
+
+	// Provide some details
+	$form['status_protrack']['details'] = array(
+		'#markup' => t('<strong>Note</strong>: This shows the last 10 ProTrack Import events.  You can\'t really do much, it\'s just to see import history.'),
+	);
+
+  // Build the sortable table header.
+  $header = array(
+    'id' => array('data' => t('ID')),
+    'run_active' => array('data' => t('Active')),
+    'run_date_start' => array('data' => t('Start Time')),
+    'run_date_end' => array('data' => t('End Time')),
+    'time_active' => array('data' => t('Time Active')),
+		'airlist_complete' => array('data' => t('Airlist Completed')),
+		'series_complete' => array('data' => t('Series Completed')),
+		'episode_complete' => array('data' => t('Episode Completed')),
+		'connect_complete' => array('data' => t('Connect Completed')),
+  );
+
+  //Build the rows.
+  $options = array();
+	$disabled = array();
+
+	$run_status_group = array();
+
+	// check the status of the last run
+	$query = db_select('kued_automation', 's')
+		->fields('s')
+		->orderBy('run_id', 'DESC')
+		->range(0,10);
+	$result = $query->execute();
+	while($record = $result->fetchAssoc()) {
+    $run_status_group[] = $record;
+  }
+
+	foreach($run_status_group as $run_status){
+		// Convert some values
+		if($run_status['run_active'] == 1){
+			$run_active = 'Yes';
+		} else {
+			$run_active = 'No';
+		}
+		// End Date Formatting
+		if($run_status['run_date_end'] == 0){
+			$time_active = REQUEST_TIME - $run_status['run_date_start'];
+			$run_date_end = t('Not Completed');
+		} else {
+			$time_active = $run_status['run_date_end'] - $run_status['run_date_start'];
+			$run_date_end = format_date($run_status['run_date_end'], 'short');
+		}
+		// Airlist formatting
+		if($run_status['airlist_complete'] == 0){
+			$airlist_complete = t('Not Completed');
+		} else {
+			$airlist_complete = format_date($run_status['airlist_complete'], 'short');
+		}
+		// Series formatting
+		if($run_status['series_complete'] == 0){
+			$series_complete = t('Not Completed');
+		} else {
+			$series_complete = format_date($run_status['series_complete'], 'short');
+		}
+		// Episode formatting
+		if($run_status['episode_complete'] == 0){
+			$episode_complete = t('Not Completed');
+		} else {
+			$episode_complete = format_date($run_status['episode_complete'], 'short');
+		}
+		// Connect formatting
+		if($run_status['connect_complete'] == 0){
+			$connect_complete = t('Not Completed');
+		} else {
+			$connect_complete = format_date($run_status['connect_complete'], 'short');
+		}
+		// Time Active Formatting
+		if($time_active) {
+			$hours = str_pad(floor($time_active / (60*60)), 2, '0', STR_PAD_LEFT);
+			$minutes = str_pad(floor(($time_active - $hours*60*60)/60), 2, '0', STR_PAD_LEFT);
+			$seconds = str_pad(floor($time_active - ($hours*60*60 + $minutes*60)), 2, '0', STR_PAD_LEFT);
+			$time_active = $hours . ':' . $minutes . ':' . $seconds;
+		}
+
+		// build the options for the table
+		$options[] = array(
+			'id' => $run_status['run_id'],
+			'run_active' => $run_active,
+			'run_date_start' => format_date($run_status['run_date_start']),
+			'run_date_end' => $run_date_end,
+			'time_active' => $time_active,
+			'airlist_complete' => $airlist_complete,
+			'series_complete' => $series_complete,
+			'episode_complete' => $episode_complete,
+			'connect_complete' => $connect_complete,
+		);
+	}
+
+  //Build the tableselect.
+  $form['status_protrack']['status'] = array(
+    '#type' => 'tableselect',
+    '#header' => $header,
+    '#options' => $options,
+    '#empty' => t('No results available.'),
+		'#js_select' => FALSE,
+		'#disabled' => TRUE,
+  );
+
+	// Clear all the import records
+	$form['status_protrack']['reset_all'] = array(
+		'#type' => 'submit',
+		'#submit' => array('clear_protrack_import_form_submit'),
+		'#value' => t('Clear All Import Records'),
+		);
+	// Clear all the import records
+	$form['status_protrack']['notes'] = array(
+		'#markup' => t('<strong>Please Note: there is no undo for this action</strong>.  However, no critical data will be lost, these records are retained primarily for housekeeping.'),
+		);
+return $form;
+}
+
+
+
+// Form to display the last run ProTrack Import
+function status_protrack_import_form(){
+	// check the status of the last run
+	$query = db_select('kued_automation', 's')
+		->fields('s')
+		->orderBy('run_id', 'DESC')
+		->range(0,1)
+		->execute();
+	$run_status = db_query($query)->fetchAssoc();
+
+	$form['status_protrack'] = array(
+	  '#type' => 'fieldset',
+	  '#title' => t('ProTrack Import Status'),
+	  '#weight' => 5,
+	  '#collapsible' => FALSE,
+	  '#collapsed' => FALSE,	
+	);
+
+	// Names of the physical files that will be imported
+	$file_name_array = array('airlist', 'series', 'episode');
+	// Path to the files
+	$file_path = drupal_realpath('private://');
+		// Go through each filetype
+		foreach($file_name_array as $file) {
+		//$file_path = drupal_realpath('private://');
+		$file_name = file_create_url($file_path . '/' . $file . '.txt');
+		// Check to see if the file exists.
+			if (file_exists($file_name)) {
+				// Find out when the file on the server was last modified
+				$file_mod_time_unix = filemtime($file_name);
+				$file_mod_time_human = format_date(filemtime($file_name), 'long');
+				
+				$file_details[$file] = $file_mod_time_human;
+			}
+		}
+
+	// Provide some details
+	$form['status_protrack']['file_details'] = array(
+		'#markup' => t('<strong>ProTrack files updated</strong>:<br /><ul><li><strong>Airlist</strong>: %airlist</li><li><strong>Series</strong>: %series</li><li><strong>Episode</strong>: %episode</li></ul><hr />', array('%airlist' => $file_details['airlist'], '%series' => $file_details['series'], '%episode' => $file_details['episode'])),
+	);
+
+  // Build the sortable table header.
+  $header = array(
+    'id' => array('data' => t('ID')),
+    'run_active' => array('data' => t('Active')),
+    'run_date_start' => array('data' => t('Start Time')),
+    'run_date_end' => array('data' => t('End Time')),
+    'time_active' => array('data' => t('Time Active')),
+		'airlist_complete' => array('data' => t('Airlist Completed')),
+		'series_complete' => array('data' => t('Series Completed')),
+		'episode_complete' => array('data' => t('Episode Completed')),
+		'connect_complete' => array('data' => t('Connect Completed')),
+  );
+
+  //Build the rows.
+  $options = array();
+	$disabled = array();
+
+	// Convert some values
+	if($run_status['run_active'] == 1){
+		$run_active = 'Yes';
+	} else {
+		$run_active = 'No';
+	}
+	// End Date Formatting
+	if($run_status['run_date_end'] == 0){
+		$time_active = REQUEST_TIME - $run_status['run_date_start'];
+		$run_date_end = t('Not Completed');
+	} else {
+		$time_active = $run_status['run_date_end'] - $run_status['run_date_start'];
+		$run_date_end = format_date($run_status['run_date_end'], 'short');
+	}
+	// Airlist formatting
+	if($run_status['airlist_complete'] == 0){
+		$airlist_complete = t('Not Completed');
+	} else {
+		$airlist_complete = format_date($run_status['airlist_complete'], 'short');
+	}
+	// Series formatting
+	if($run_status['series_complete'] == 0){
+		$series_complete = t('Not Completed');
+	} else {
+		$series_complete = format_date($run_status['series_complete'], 'short');
+	}
+	// Episode formatting
+	if($run_status['episode_complete'] == 0){
+		$episode_complete = t('Not Completed');
+	} else {
+		$episode_complete = format_date($run_status['episode_complete'], 'short');
+	}
+	// Connect formatting
+	if($run_status['connect_complete'] == 0){
+		$connect_complete = t('Not Completed');
+	} else {
+		$connect_complete = format_date($run_status['connect_complete'], 'short');
+	}
+	// Time Active Formatting
+	if($time_active) {
+		$hours = str_pad(floor($time_active / (60*60)), 2, '0', STR_PAD_LEFT);
+		$minutes = str_pad(floor(($time_active - $hours*60*60)/60), 2, '0', STR_PAD_LEFT);
+		$seconds = str_pad(floor($time_active - ($hours*60*60 + $minutes*60)), 2, '0', STR_PAD_LEFT);
+		$time_active = $hours . ':' . $minutes . ':' . $seconds;
+	}
+
+/*
+	// Check for active queues
+	$queues = array(
+		'protrack_import_airlist',
+		'protrack_import_series',
+		'protrack_import_episode',
+		'protrack_import_airlist_connect',
+		'protrack_import_end_queue'
+	);
+	$active_queue = array();
+	foreach($queues as $queue){
+		$result = db_query("SELECT DISTINCT name FROM {queue}");
+		$active_queue[] = $result->fetchAll();
+	}
+
+  foreach ($queues as $name) {
+    $queue = DrupalQueue::get($name);
+    if (isset($defined_queues[$name]['delete'])) {
+      $function = $defined_queues[$name]['delete'];
+      $function($queue);
+    }
+    $queue->deleteQueue();
+  }
+
+item_id
+name
+data
+expire
+created
+
+
+	// Flag that the airlist phase is complete
+	$query = db_select('queue', 'q')
+		->fields('q')
+		->condition('name', 'protrack_import','LIKE')
+		->execute();
+	$queue_results = db_query($query)->fetchField();
+	dsm($queue_results);
+*/
+
+	// build the options for the table
+  $options[$run_status['run_id']] = array(
+    'id' => $run_status['run_id'],
+    'run_active' => $run_active,
+    'run_date_start' => format_date($run_status['run_date_start']),
+    'run_date_end' => $run_date_end,
+    'time_active' => $time_active,
+    'airlist_complete' => $airlist_complete,
+    'series_complete' => $series_complete,
+    'episode_complete' => $episode_complete,
+    'connect_complete' => $connect_complete,
+  );
+
+  //Build the tableselect.
+  $form['status_protrack']['status'] = array(
+    '#type' => 'tableselect',
+    '#header' => $header,
+    '#options' => $options,
+    '#empty' => t('No results available.'),
+		'#required' => TRUE,
+		'#js_select' => FALSE,
+  );
+	// Provide some details
+	$form['status_protrack']['details'] = array(
+		'#markup' => t('<strong>Note</strong>: This process should never take more than an two hours to complete, usually closer to 10 minutes. If the field <em>Active</em> is set to "<strong>Yes</strong>" and <em>Time Active</em> is greater than two hours you can safely reset the status.  If <em>Active</em> is set to "<strong>No</strong>" then the <em>Time Active</em> field simply tells you how long it took for the import to run.<hr />'),
+	);
+	// Provide some details
+	$form['status_protrack']['reset_details'] = array(
+		'#markup' => t('When you reset this process the import will happen automatically at the next scheduled time.  Or, if you\'re an admin, you can run the cron process manually after resetting the status.<hr />'),
+	);
+
+	// submit the form
+	$form['status_protrack']['submit'] = array(
+		'#type' => 'submit',
+		'#value' => t('Delete This Import Record'),
+		);
+
+return $form;
+}
+
+
+// Function to clear all automation records
+function clear_protrack_import_form_submit($form, &$form_state){
+	// Empty the table
+	if(db_query("TRUNCATE TABLE kued_automation")){
+		drupal_set_message(t('All records were deleted.'));
+	}
+	// Now insert a blank record, we need something in there to restart the automation process next time around...
+	// Minus one day so we can ensure that the latest record is picked up and imported.
+	$run_id = db_insert('kued_automation')
+	->fields(array(
+		'run_date_start' => REQUEST_TIME - 86400,
+		'run_date_end' => REQUEST_TIME - 86400,
+		'airlist_complete' => REQUEST_TIME - 86400,
+		'series_complete' => REQUEST_TIME - 86400,
+		'episode_complete' => REQUEST_TIME - 86400,
+		'connect_complete' => REQUEST_TIME - 86400,
+		'run_active' => 0,
+		))
+	->execute();
+}
+
+
+//Submit function to delete the last ProTrack Import record
+function status_protrack_import_form_submit($form, &$form_state) {
+	//dsm($form_state);
+	foreach($form_state['input']['status'] as $status){
+		$status = $status;
+	}
+	// Remove the last automation record
+	$field_delete = db_delete('kued_automation')
+		->condition('run_id', $status)
+		->execute();
+
+	drupal_set_message(t('The last ProTrack Import was successfully removed and the process is ready to run again. If you see no problems with the import status shown below you can either run the cron manually or wait for the automation to start the process.  Cron runs every 15 minutes starting at 1 minute after the hour.'));
+}
+
+
+
+///////////////////
+function protrack_import_admin() {
+  return array(
+		'#markup' => t('This is the KUED ProTrack Import page.<br />Import: <a href="@series_link">Series</a> | <a href="@episode_link">Episode</a> | <a href="@airlist_link">Airlist</a>',
+		array('@series_link' => url('admin/config/content/kued/protrack_import/series',array('absolute' => TRUE)),'@episode_link' => url('admin/config/content/kued/protrack_import/episode',array('absolute' => TRUE)),'@airlist_link' => url('admin/config/content/kued/protrack_import/airlist',array('absolute' => TRUE))))
+	);
+}
+
+
+
+/*
+//$series_file_location = "sites/default/files/protrack_import/series.txt";
+//$uri = "file://";
+
+//drupal_set_message(t("$series_file_location"), 'status');
+$dir = "sites/default/files/protrack_import/";
+$series_file = "series.txt";
+$episode_file = "episode.txt";
+$airlist_file = "airlist.txt";
+$series_file_location = "$dir"."$series_file";
+
+//if(file_valid_uri($series_file_location)) {
+if(file_exists("$series_file_location")) {
+drupal_set_message(t('exists!'), 'status');
+} else {
+drupal_set_message(t('gone!'), 'error');
+}
+*/
+
+
+//print_r($file);
+
+//if(function_exists('dpr')) dpr($file);
+
+
+
+/**
+* Form function, called by drupal_get_form()
+* in protrack_import_menu().
+*/
+function series_protrack_import($form_state){
+	$file = "series.txt";
+	$file_path = drupal_realpath('private://');
+	$file_location = file_create_url($file_path . '/' . $file);
+
+	$form['series_protrack'] = array(
+	  '#type' => 'fieldset',
+	  '#title' => t('ProTrack Series Import'),
+	  '#weight' => 5,
+	  '#collapsible' => FALSE,
+	  '#collapsed' => FALSE,	
+		);
+	
+	$form['series_protrack']['file'] = array(
+		'#type' => 'textfield',
+		'#title' => t('File to Import:'),
+		'#default_value' => $file_location,
+		'#size' => 100,
+		'#attributes' => array('readonly' => 'readonly'),
+		);
+	
+	$form['series_protrack']['series_import_button'] = array(
+		'#type' => 'submit',
+		'#value' => t('Import ProTrack Series Data')
+		);
+
+  return $form;
+}
+
+function series_protrack_import_form() {
+  return drupal_get_form('series_protrack_import');
+}
+
+
+/**
+ * Form function, called by drupal_get_form()
+ * in protrack_import_menu().
+ */
+function episode_protrack_import($form_state){
+	//$file = "episode-short.txt";
+ 	$file = "episode.txt";
+	$file_path = drupal_realpath('private://');
+	$file_location = file_create_url($file_path . '/' . $file);
+
+	$form['episode_protrack'] = array(
+	  '#type' => 'fieldset',
+	  '#title' => t('ProTrack Episode Import'),
+	  '#weight' => 5,
+	  '#collapsible' => FALSE,
+	  '#collapsed' => FALSE,
+		);
+	
+	$form['episode_protrack']['file'] = array(
+		'#type' => 'textfield',
+		'#title' => t('File to Import:'),
+		'#default_value' => $file_location,
+		'#size' => 100,
+		'#attributes' => array('readonly' => 'readonly'),
+		);
+
+	if(module_exists('protrack_import_cove')) {
+		$form['episode_protrack']['cove'] = array(
+			'#type' => 'checkbox',
+			'#title' => t('Import COVE Videos'),
+			//'#return_value' => 1,
+			//'#default_value' => 0,
+			'#description' => t('<strong>PLEASE NOTE:</strong> By checking this box the import system will search the COVE database and import videos automatically. <em>Warning:</em> this process takes hours to complete and should only be run once a week at most.'),
+			);
+	}
+
+	$form['episode_protrack']['episode_import_button'] = array(
+		'#type' => 'submit',
+		'#value' => t('Import ProTrack Episode Data')
+		);
+
+  return $form;
+}
+
+function episode_protrack_import_form() {
+  return drupal_get_form('episode_protrack_import');
+}
+
+
+/**
+ * Form function, called by drupal_get_form()
+ * in protrack_import_menu().
+ */
+function airlist_protrack_import($form_state){
+	$file = "airlist.txt";
+	$file_path = drupal_realpath('private://');
+	$file_location = file_create_url($file_path . '/' . $file);
+	
+	$form['airlist_protrack'] = array(
+		'#type' => 'fieldset',
+		'#title' => t('ProTrack airlist Import'),
+		'#weight' => 5,
+		'#collapsible' => FALSE,
+		'#collapsed' => FALSE,	
+		);
+	
+	$form['airlist_protrack']['file'] = array(
+		'#type' => 'textfield',
+		'#title' => t('File to Import:'),
+		'#default_value' => $file_location,
+		'#size' => 100,
+		'#attributes' => array('readonly' => 'readonly'),
+		);
+	
+	$form['airlist_protrack']['airlist_import_button'] = array(
+		'#type' => 'submit',
+		'#value' => t('Import ProTrack Airlist Data')
+		);
+
+  return $form;
+}
+
+function airlist_protrack_import_form() {
+  return drupal_get_form('airlist_protrack_import');
+}
+
+
+/**
+ * Impliment hook_submit
+ */
+function series_protrack_import_submit($form, &$form_state) {
+	//Get the file
+	$file = $form_state['values']['file'];
+  if (file_exists($file)) {
+    //Here is where we execute the big import
+    series_protrack_collect($file);
+  }
+}
+
+/**
+ * Impliment hook_submit
+ */
+function episode_protrack_import_submit($form, &$form_state) {
+	if(module_exists('protrack_import_cove')) {
+		//Get the file
+		$file = $form_state['values']['file'];
+		if(!empty($form_state['input']['cove'])) {
+			if($form_state['input']['cove'] == 1) {
+				variable_set('protrack_import_cove', 1);
+			}
+		} else {
+			variable_set('protrack_import_cove', 0);
+		}
+	} else {
+		$file = $form_state['values']['file'];
+	}
+  if (file_exists($file)) {
+    //Here is where we execute the big import
+    episode_protrack_collect($file);
+  }
+}
+
+/**
+ * Impliment hook_submit
+ */
+function airlist_protrack_import_submit($form, &$form_state) {
+	//Get the file
+	$file = $form_state['values']['file'];
+  if (file_exists($file)) {
+    //Here is where we execute the big import
+    airlist_protrack_collect($file);
+  }
+}
+
+
+////////////////////////
+////////////////////////
+////////////////////////
+// Here we have the batch processes
+////////////////////////
+////////////////////////
+////////////////////////
+
+// Series import
+function series_protrack_collect($file) {
+  // redirect path upon batch completion
+  $redirect_path = 'admin/config/content/kued/protrack_import/series';
+
+  // batch array structure
+  $batch = array(
+    'title' => t('Reading Airlist and Series File Information'),
+    'operations' => array(
+    	array('_protrack_import_airlist_incoming_empty', array($file)),
+    	array('_protrack_import_airlist_import', array($file)),
+    	array('_protrack_import_data_import', array($file)),
+    	array('_protrack_import_airlist_connect', array($file)),
+    	array('_protrack_import_airlist_empty', array($file)),
+    ),
+		'init_message' => t('Starting...'),
+		'progress_message' => t('Batch @current out of @total'),
+		'error_message' => t('An error occurred and some or all of the batch has failed.'),
+  );
+  // set batch
+  batch_set($batch);
+  // process batch
+  batch_process($redirect_path);
+}
+
+// Episode import
+function episode_protrack_collect($file) {
+  // redirect path upon batch completion
+  $redirect_path = 'admin/config/content/kued/protrack_import/episode';
+
+  // batch array structure
+  $batch = array(
+    'title' => t('Reading Episode File Information'),
+    'operations' => array(
+    	array('_protrack_import_airlist_incoming_empty', array($file)),
+    	array('_protrack_import_airlist_import', array($file)),
+     	array('_protrack_import_data_import', array($file)),
+    	array('_protrack_import_airlist_connect', array($file)),
+
+      //array('_protrack_import_airdate_connect', array($file)),
+
+    	array('_protrack_import_airlist_empty', array($file)),
+    ),
+		'init_message' => t('Starting...'),
+		'progress_message' => t('Batch @current out of @total'),
+		'error_message' => t('An error occurred and some or all of the batch has failed.'),
+  );
+  // set batch
+  batch_set($batch);
+  // process batch
+  batch_process($redirect_path);
+}
+
+/*
+// Airlist Import
+function airlist_protrack_collect($airlist_file) {
+  // redirect path upon batch completion
+  $redirect_path = 'admin/config/kued/protrack_import/airlist';
+
+  // batch array structure
+  $batch = array(
+    'title' => t('Reading Airlist File Information'),
+    'operations' => array(
+      array('_protrack_import_data_import', array($airlist_file),),
+    ),
+		'init_message' => t('Starting...'),
+		'progress_message' => t('Batch @current out of @total'),
+		'error_message' => t('An error occurred and some or all of the batch has failed.'),
+  );
+
+  // set batch
+  batch_set($batch);
+  // process batch
+  batch_process($redirect_path);
+}
+*/
+
+// Airlist Import
+function airlist_protrack_collect($file) {
+  // define a redirect path upon batch completion
+  $redirect_path = 'admin/config/content/kued/protrack_import/airlist';
+
+  // define batch array structure
+  $batch = array(
+    'title' => t('Reading Airlist File Information'),
+    'operations' => array(
+		array('_protrack_import_airlist_import', array($file)),
+		array('_protrack_import_airlist_empty', array($file)),
+    ),
+		'init_message' => t('Starting...'),
+		'progress_message' => t('Batch @current out of @total'),
+		'error_message' => t('An error occurred and some or all of the batch has failed.'),
+  );
+  // set batch
+  batch_set($batch);
+  // process batch
+  batch_process($redirect_path);
+}
+
+
+////////////////////////
+////////////////////////
+////////////////////////
+// This is the main import, where the magic happens
+function _protrack_import_data_import($data_file, &$context) {
+	$n=0;
+
+	if (empty($context['sandbox'])) {
+		$context['sandbox']['progress'] = 0;
+		$context['sandbox']['max'] = count(file($data_file));
+		$context['sandbox']['file_pointer_position'] = '';
+		}
+
+	// define batch limit
+	$batch_limit = 25;
+	// assume the batch process has not completed
+	$context['finished'] = 0;
+	// open the file for reading
+	$file_handle = fopen($data_file, 'r');
+
+	//Check the file type so I can do the correct function
+	$file_type_check1 = strpos($data_file, 'series'); // Files is Series
+		if($file_type_check1 !== FALSE) {
+		$file_type = 'series';
+		//drupal_set_message(t('Series Import'));
+		}
+	$file_type_check2 = strpos($data_file, 'episode'); // Files is Episode
+		if($file_type_check2 !== FALSE) {
+		$file_type = 'episode';
+		//drupal_set_message(t('Episode Import'));
+		}
+	$file_type_check3 = strpos($data_file, 'airlist'); // File is Airlist
+		if($file_type_check3 !== FALSE) {
+		$file_type = 'airlist';
+		//drupal_set_message(t('Airlist Import'));
+		}
+
+  // check if file pointer position exists in the sandbox, and jump to location in file
+  if ($context['sandbox']['file_pointer_position']) {
+	  fseek($file_handle, $context['sandbox']['file_pointer_position']);
+  }
+
+// Load the appropriate import functions
+switch ($file_type) {
+	case 'series':
+		require_once(dirname(__FILE__) . '/protrack_import.functions.inc');
+		require_once(dirname(__FILE__) . '/protrack_import.series.functions.inc');
+	break;
+	case 'episode':
+		require_once(dirname(__FILE__) . '/protrack_import.functions.inc');
+		require_once(dirname(__FILE__) . '/protrack_import.episode.functions.inc');
+	break;
+	case 'airlist':
+		require_once(dirname(__FILE__) . '/protrack_import.functions.inc');
+	break;
+}
+
+//if(!$n){ $n=1; }
+					
+  // loop through the file and stop at batch limit
+  for ($i = 0; $i < $batch_limit; $i++) {
+    // get file line as csv
+    $file_data_row = fgetcsv($file_handle, 0, "|");
+
+    // Run the function to import the array
+    if(is_array($file_data_row)) {
+			// Get the file type
+			if($file_type == 'series') {
+					// Skip the first line
+					if(is_numeric($file_data_row[0])) {
+						$query = db_select('protrack_airlist_incoming', 'p')
+							->condition('series_id', $file_data_row[0], '=')
+							->fields('p', array('channel'))
+							->range(0,1);
+						$airlist_check = $query->execute()->fetchField();
+						if($airlist_check) {
+							$nid = series_protrack_prepare($file_data_row);
+							protrack_import_expire($file_data_row[0], $file_type);
+						}
+						//series_protrack_single($file_data_row);
+					}
+				} elseif($file_type == 'episode') {
+					// Skip the first line
+					if(is_numeric($file_data_row[1])) {
+            //dpm($file_data_row['1']);
+						//drupal_set_message('<pre>'.print_r($file_data_row, TRUE).'</pre>');
+						episode_protrack_prepare($file_data_row);
+						protrack_import_expire($file_data_row[1], $file_type, $file_data_row[16]);
+						//episode_protrack_single($file_data_row);
+					}
+				} elseif($file_type == 'airlist') {
+					// Skip the first line
+					if(is_numeric($file_data_row[1])) {
+						//require_once(dirname(__FILE__) . '/protrack_import.functions.inc');
+						airlist_protrack_prepare($file_data_row);
+						//drupal_set_message('<pre>'.print_r($file_data_row, TRUE).'</pre>'); 
+					}
+				}
+			$context['sandbox']['progress']++;
+		}
+			
+		// Show progress
+		if ($context['sandbox']['progress'] != $context['sandbox']['max']) {
+			$context['finished'] = $context['sandbox']['progress'] / $context['sandbox']['max'];
+			$context['message'] = t('Now processing %v', array('%v' => $context['sandbox']['progress']));
+		}
+
+		// retain current file pointer position
+		$context['sandbox']['file_pointer_position'] = ftell($file_handle);
+    // check for EOF
+    if (feof($file_handle)) {
+      // complete the batch process
+      $context['finished'] = 1;
+			drupal_set_message(t('<strong>@v</strong> Records Added', array('@v' => $context['sandbox']['progress'])));
+
+      // end loop
+      break;
+    }		
+  }
+}
+
+function series_protrack_single($row) {
+	$insert = db_insert('protrack_series')
+	->fields(array(
+		'series_id' => $row[0],
+		'series_code' => $row[1],
+		'series_title' => $row[2],
+		'series_description' => $row[3],
+		'series_url' => $row[4],
+		'series_pgm_type' => $row[5],
+	))
+	->execute();
+}
+
+function episode_protrack_single($row){
+  /*
+  // searching for missing quotes.  that breaks things
+  if(!substr_count($row[7], '"') % 2 == 0) {
+    $row[7] = $row[7] . '"';
+  }
+
+	$insert = db_insert('protrack_episode')
+	->fields(array(
+		'series_id' => $row[0],
+		'program_id' => $row[1],
+		'version_id' => $row[2],
+		'episode_len' => $row[3],
+		'episode_num' => $row[4],
+		'episode_title' => $row[5],
+		'episode_guide' => $row[6],
+		'episode_desc' => $row[7],
+		'episode_url' => $row[8],
+		'episode_rating' => $row[9],
+		'episode_language' => $row[10],
+		'episode_caption' => $row[11],
+		'episode_dvs' => $row[12],
+		'episode_stereo' => $row[13],
+		'episode_hdtv' => $row[14],
+		'episode_letterbox' => $row[15],
+		'episode_source' => $row[16],
+		'episode_topic1' => $row[17],
+		'episode_topic1_t' => $row[18],
+		'episode_topic2' => $row[19],
+		'episode_topic2_t' => $row[20],
+		'episode_sdef' => $row[21],
+		'episode_sdef_t' => $row[22],
+		//'rits_start' => $row[23],
+		//'rits_end' => $row[24],
+		'keywords' => $row[25],
+		'episode_genre' => $row[26],
+		'pack_type' => $row[27]
+	))
+	->execute();
+*/
+}
+
+
+////////////////////////
+////////////////////////
+////////////////////////
+// This adds expire dates to every series and episode in the system
+function protrack_import_expire($item_id, $file_type, $episode_source = '') {
+	// Now deal with the expiration date
+	// First get latest occurance of fulldate from protrack_airlist_incoming
+	if($file_type == 'series') {
+	  // Get the series nid
+		$query = db_select('field_data_field_series_id', 'f')
+			->fields ('f', array ('entity_id'))
+			->condition('field_series_id_value', $item_id);
+		$nid = $query->execute()->fetchField();
+
+    // Get the series id (protrack)
+		$query = db_select('protrack_airlist_incoming', 'p')
+			->fields ('p', array ('fulldate'))
+			->condition('series_id', $item_id)
+			->orderBy('fulldate', 'DESC')
+			->range(0,1);
+		$fulldate = $query->execute()->fetchField();
+
+    // Backup check - in case the file get failed
+    if(!$fulldate) {
+      // Get the program ID (Protrack)
+      $query = db_select('protrack_airlist', 'p')
+        ->fields ('p', array ('fulldate'))
+        ->condition('series_id', $item_id)
+        ->orderBy('fulldate', 'DESC')
+        ->range(0,1);
+      $fulldate = $query->execute()->fetchField();
+    }
+	} else {
+    // Or get the same info about the episode
+		$query = db_select('field_data_field_program_id', 'f')
+			->fields ('f', array ('entity_id'))
+			->condition('field_program_id_value', $item_id);
+		$nid = $query->execute()->fetchField();
+
+		// Get the program ID (Protrack)
+		$query = db_select('protrack_airlist_incoming', 'p')
+			->fields ('p', array ('fulldate'))
+			->condition('program_id', $item_id)
+			->orderBy('fulldate', 'DESC')
+			->range(0,1);
+		$fulldate = $query->execute()->fetchField();
+
+    // Backup check - in case the file get failed
+    if(!$fulldate) {
+      // Get the program ID (Protrack)
+      $query = db_select('protrack_airlist', 'p')
+        ->fields ('p', array ('fulldate'))
+        ->condition('program_id', $item_id)
+        ->orderBy('fulldate', 'DESC')
+        ->range(0,1);
+      $fulldate = $query->execute()->fetchField();
+    }
+	}
+
+  //dpm($nid);
+  //dpm($item_id);
+  //dpm(date('c',strtotime($fulldate)));
+
+  // If there's no fulldate then bail...
+  if(!$fulldate) {
+    //dpm('Fulldate failed.  Skip this entire process.');
+  } else {
+    // #1 Check to see if this item is already scheduled
+    $query = db_select('scheduler', 's')
+      ->condition('nid', $nid)
+      ->fields ('s', array ('unpublish_on'));
+    $expire_check = $query->execute()->fetchField();
+    //dpm(date('c',$expire_check));
+    if(!$expire_check) {
+      $expire_check = 0;
+    }
+
+    // #2 Set a default expire time
+    //$expire = strtotime($fulldate) + 2592000; // Convert to UNIX timestamp + Add 30 days
+    $expire = strtotime($fulldate) + 7776000; // Convert to UNIX timestamp + Add 90 days
+    //dpm(date('c',$expire));
+
+    // Get the status of the current node
+		$query = db_select('node', 's')
+			->fields ('s', array ('status'))
+			->condition('nid', $nid);
+		$status = $query->execute()->fetchField();
+
+    // One last error check
+    // This should greatly speed this process
+    $proceed = 0;
+    if($status == 0 && $expire > REQUEST_TIME) {
+      $proceed = 1; 
+    }
+    if($expire > $expire_check) {
+      $proceed = 1; 
+    }
+    // KUED LOCAL CONTENT CHECK //
+    if($episode_source == 'KUED') {
+      $kued_production = 1;
+      $proceed = 1;
+    } else {
+      $kued_production = 0;
+    }
+
+    // #3 If an expire date is greater than
+    // what we already have then update the node.
+    // Otherwise we can skip this very taxing save process.
+    if($proceed == 1) {
+      // Scheduler phase
+      $now = REQUEST_TIME; // we need to know now
+      $node = node_load($nid); // I'd hoped to avoid this but we're going to need the node
+      $node_status = 1; // Reset the node status to avoid confusion
+      $lock = 0;
+  
+      if(is_object($node)) {
+        // Check the type and get lock status
+        if($file_type == 'episode') {
+          if(isset($node->field_episode_lock[$node->language][0]['value'])) {
+            $lock = $node->field_episode_lock[$node->language][0]['value'];      
+          }
+        } elseif($file_type == 'series') {
+          if(isset($node->field_series_lock[$node->language][0]['value'])) {
+            $lock = $node->field_series_lock[$node->language][0]['value'];
+          }
+        } else {
+          $lock = 0; 
+        }
+    
+      // We need to check to see if this node is locked or a KUED production or a series file type that won't have the lock
+      if($lock == 0) {
+        // Now update the expiration date of this episode.
+        $node->unpublish_on = $expire;
+
+        /*
+        // Simple array to include the new expire info        
+        // #2 check for expire date
+        $query = db_select('scheduler', 's')
+          ->condition('nid', $nid)
+          ->fields ('s', array ('unpublish_on'));
+        $expire_check = $query->execute()->fetchField();
+        
+        if(!strlen($expire_check)) {
+          //drupal_set_message('<pre>expire check MISSING: '.print_r($expire_check, TRUE).'</pre>');
+          // #3 if no expire date add one
+          db_insert('scheduler')
+            ->fields($expire)
+            ->execute();
+         } else {
+          //drupal_set_message('<pre>expire check PRESENT: '.print_r($expire_check, TRUE).'</pre><hr />');
+          // #4 else update what we have there
+          $update_query = db_update('scheduler')   
+            ->fields($update_expire)
+            ->condition('nid', $nid);
+          $expire_update = $update_query->execute();
+          }
+         */
+    
+        } else {
+          // Node is locked! Bail out!
+          $node_status = 1; // Set to Publish - sure
+          // dpm('node is locked or is a series, do not modify the expire time.');     
+        }
+
+        if(isset($node)) {
+          if($node->status == 0 && $expire > $now) {
+           //Get the published status - if it needs to be republished then do it
+           // This is unpublished and it shouldn't be
+           $node_status = 1; // Set to Publish
+          } elseif($node->status == 1 && $expire < $now) {
+            // Remove scheduler dates - this is past and note auto-removed
+            $node_status = 0;
+            db_delete('scheduler')->condition('nid', $node->nid)->execute();
+            $node->scheduler = '';
+            $node->publish_on = '';
+            $node->unpublish_on = '';
+          }
+
+          // Status update - Publish this node if it needs it
+          if($node_status == 1) {
+            if($node->status == 0) {
+              $node->status = 1;
+            }
+          } elseif($node_status == 0) {
+            if($node->status == 1) {
+              $node->status = 0;
+            }
+          }
+
+          //If this is a KUED production, remove publish and expire dates!
+          if($kued_production == 1) {
+            // Remove scheduler dates if it's a KUED Production
+            db_delete('scheduler')->condition('nid', $node->nid)->execute();
+            $node->scheduler = '';
+            $node->publish_on = '';
+            $node->unpublish_on = '';
+            // If this is flagged as a KUED production publish it no matter what.	
+            $node->status = 1; // Set to publish
+          }
+
+          /*
+          dpm($node->title);
+          dpm($node->nid);
+          dpm(date('c',$expire));
+          dpm($node->status);
+          dpm('-----');
+          */
+          // Save the node
+          if($node = node_submit($node)) {
+            //dpm($node);
+            node_save($node);    
+          }
+        }
+      }
+    }
+  }
+}
+
+
+
+////////////////////////
+////////////////////////
+////////////////////////
+// This imports the Airlist to the 'protrack_airlist_incoming' table - part of the housekeeping functions
+function _protrack_import_airlist_import($source_file, &$context) {
+
+	// Get the airlist file - this is going to take a while
+	//$data_file = "sites/default/files/protrack_import/airlist.txt";
+	$file = "airlist.txt";
+	$file_path = drupal_realpath('private://');
+	$data_file = file_create_url($file_path . '/' . $file);
+
+  if (empty($context['sandbox'])) {
+    $context['sandbox']['progress'] = 0;
+	$context['sandbox']['max'] = count(file($data_file));
+	$context['sandbox']['file_pointer_position'] = '';
+  }
+
+  // define batch limit
+  $batch_limit = 1000;
+  // assume the batch process has not completed
+  $context['finished'] = 0;
+  // open the file for reading
+  $file_handle = fopen($data_file, 'r');
+
+  // check if file pointer position exists in the sandbox, and jump to location in file
+  if ($context['sandbox']['file_pointer_position']) {
+	  fseek($file_handle, $context['sandbox']['file_pointer_position']);
+  }
+
+		// loop through the file and stop at batch limit
+		for ($i = 0; $i < $batch_limit; $i++) {
+			// get file line as csv
+			$file_data_row = fgetcsv($file_handle, 0, "|");
+	
+			//Filter out the UEN crap
+			$channel = $file_data_row['5'];
+			if($channel != 'KUEN-DT' && $channel != 'MHZ' && $channel != 'FNX') {
+				// Run the function to import the array
+				if(is_array($file_data_row)) {
+					// Skip the first line
+					if(is_numeric($file_data_row[1])) {
+            // TEMP FIX FOR STATE OF THE UNION
+            if($file_data_row[0] == '2018-01-30 19:00:00' && $file_data_row[5] == 'KUED-HD') {
+              $file_data_row[2] = '000000';
+              $file_data_row[4] = '';
+            }
+					  // Insert each row here
+						$airlist_row = array(
+							'fulldate' => $file_data_row['0'],
+							'series_id' => $file_data_row['1'],
+							'program_id' => $file_data_row['2'],
+							'version_id' => $file_data_row['3'],
+							'rebroadcast' => $file_data_row['4'],
+							'channel' => $channel,
+							);
+						db_insert('protrack_airlist_incoming')
+							->fields($airlist_row)
+							->execute();
+	
+//drupal_set_message('<pre>'.print_r($airlist_row, TRUE).'</pre><hr />');
+					}
+				$context['sandbox']['progress']++;
+				}
+			}
+		// Show progress
+		if ($context['sandbox']['progress'] != $context['sandbox']['max']) {
+			$context['finished'] = $context['sandbox']['progress'] / $context['sandbox']['max'];
+			$context['message'] = t('Now processing %v', array('%v' => $context['sandbox']['progress']));
+		}
+
+		// retain current file pointer position
+		$context['sandbox']['file_pointer_position'] = ftell($file_handle);
+
+    // check for EOF
+    if (feof($file_handle)) {
+      // complete the batch process
+      $context['finished'] = 1;
+
+			drupal_set_message(t('<strong>@v</strong> Records added to Airlist Incoming', array('@v' => $context['sandbox']['progress'])));
+
+      // end loop
+      break;
+    }
+  }
+}
+
+
+////////////////////////
+////////////////////////
+////////////////////////
+// This empties the 'protrack_airlist_incoming' table
+function _protrack_import_airlist_empty($source_file, &$context) {
+  if (file_exists($source_file)) {
+    db_query("TRUNCATE TABLE protrack_airlist");
+    db_query("INSERT INTO protrack_airlist SELECT * FROM protrack_airlist_incoming");
+    db_query("TRUNCATE TABLE protrack_airlist_incoming");
+    variable_set('protrack_import_cove', 0);
+  }
+}
+
+////////////////////////
+////////////////////////
+////////////////////////
+// This empties the 'protrack_xxx_incoming' table
+function _protrack_import_airlist_incoming_empty($data_file, &$context) {
+  if (file_exists($data_file)) {
+    db_query("TRUNCATE TABLE protrack_airlist_incoming");
+    //Check the file type so I can truncate the correct table
+    $file_type_check1 = strpos($data_file, 'series'); // Files is Series
+    if($file_type_check1 !== FALSE) {
+      $file_type = 'series';
+      db_query("TRUNCATE TABLE protrack_series");
+    }
+    $file_type_check2 = strpos($data_file, 'episode'); // Files is Episode
+    if($file_type_check2 !== FALSE) {
+      $file_type = 'episode';
+      db_query("TRUNCATE TABLE protrack_episode");
+    }
+  }
+}
+
+
+
+////////////////////////
+////////////////////////
+////////////////////////
+// This is the Airlist Connect - adds the channel taxonomy to the Series and Episode objects
+function _protrack_import_airlist_connect($source_file, &$context) {
+	require_once(dirname(__FILE__) . '/protrack_import.functions.inc');
+
+	// Get the airlist file - this is going to take a while
+	$file = "airlist.txt";
+	$file_path = drupal_realpath('private://');
+	$data_file = file_create_url($file_path . '/' . $file);
+	//$data_file = "sites/default/files/protrack_import/airlist.txt";
+
+	if (empty($context['sandbox'])) {
+		$context['sandbox']['progress'] = 0;
+		$context['sandbox']['max'] = count(file($data_file));
+		$context['sandbox']['file_pointer_position'] = '';
+		}
+
+  // define batch limit
+  $batch_limit = 500;
+  // assume the batch process has not completed
+  $context['finished'] = 0;
+  // open the file for reading
+  $file_handle = fopen($data_file, 'r');
+
+  // check if file pointer position exists in the sandbox, and jump to location in file
+  if($context['sandbox']['file_pointer_position']) {
+	  fseek($file_handle, $context['sandbox']['file_pointer_position']);
+  }
+
+  // loop through the file and stop at batch limit
+  for ($i = 0; $i < $batch_limit; $i++) {
+    // get file line as csv
+    $file_data_row = fgetcsv($file_handle, 0, "|");
+
+		//Filter out the UEN crap
+		$channel = $file_data_row['5'];
+		if($channel != 'KUEN-DT' && $channel != 'MHZ' && $channel != 'FNX') {
+			// Run the function to import the array
+			if(is_array($file_data_row)) {
+						// Skip the first line
+						if(is_numeric($file_data_row[1])) {
+						airlist_connect($source_file, $file_data_row, $channel);
+				}
+			$context['sandbox']['progress']++;
+			}
+		}
+
+		// Show progress
+		if ($context['sandbox']['progress'] != $context['sandbox']['max']) {
+
+			$context['finished'] = $context['sandbox']['progress'] / $context['sandbox']['max'];
+			$context['message'] = t('Now processing %v', array('%v' => $context['sandbox']['progress']));
+		}
+
+		// retain current file pointer position
+		$context['sandbox']['file_pointer_position'] = ftell($file_handle);
+
+    // check for EOF
+    if (feof($file_handle)) {
+      // complete the batch process
+      $context['finished'] = 1;
+
+			drupal_set_message(t('<strong>@v</strong> Channel Connections Checked', array('@v' => $context['sandbox']['progress'])));
+
+      // end loop
+      break;
+    }
+  }
+}
+
+
+
+////////////////////////
+////////////////////////
+////////////////////////
+// This function connects the channel data to the episode and series
+function airlist_connect($data_file, $file_data_row, $channel) {
+	require_once(dirname(__FILE__) . '/protrack_import.functions.inc');
+	// Assign some variables for the import	
+	//$fulldate = $file_data_row[0]; // text
+	$series_id = $file_data_row[1]; // reference
+	$program_id = $file_data_row[2]; // reference
+	//$version_id = $file_data_row[3]; // reference
+	//$rebroadcast = $file_data_row[4]; //text
+	$channel = $file_data_row[5]; // taxonomy
+	$channel = channel_fix($channel); // taxonomy
+
+	//Check the file type so I can do the correct function
+	$file_type_check1 = strpos($data_file, 'series'); // Files is Series
+		if($file_type_check1 !== FALSE) {
+		$file_type = 'series';
+		//drupal_set_message(t('Series Connect'));
+		}
+	$file_type_check2 = strpos($data_file, 'episode'); // Files is Episode
+		if($file_type_check2 !== FALSE) {
+		$file_type = 'episode';
+		//drupal_set_message(t('Episode Connect'));
+		}
+/*
+	$file_type_check3 = strpos($data_file, 'airlist'); // File is Airlist
+		if($file_type_check3 !== FALSE) {
+		$file_type = 'airlist';
+		//drupal_set_message(t('Airlist Import'));
+		}
+*/
+
+			// Get the file type
+			if($file_type == 'series') {
+				// Get the series nid
+				if(is_numeric($series_id)){
+					$query = db_select('field_data_field_series_id', 'f')
+						->condition('field_series_id_value', $series_id, '=')
+						->fields ('f', array ('entity_id'))
+						->range(0,1);
+					$nid = $query->execute()->fetchField();
+					//drupal_set_message(t('nid: @v', array('@v' => $nid)));
+
+				// The series exists
+				if(strlen($nid)) {
+					if($airlist_taxonomy = taxonomy_get_term_by_name($channel)) {
+						$airlist_taxonomy_keys = array_keys($airlist_taxonomy);
+						//drupal_set_message(t('taxonomy: @v', array('@v' => $airlist_taxonomy_keys[0])));
+			
+						// Check to see if it already has the connected channel taxonomy
+						//$taxonomy_check = db_query("SELECT tid FROM {taxonomy_index} WHERE nid = :nid AND tid = :airlist_tid", array(':nid' => $nid, ':airlist_tid' => $airlist_taxonomy_keys[0]))->fetchField();
+						$query = db_select('taxonomy_index', 't')
+							->condition('nid', $nid, '=')
+							->condition('tid', $airlist_taxonomy_keys[0], '=')
+							->fields ('t', array ('tid'))
+							->range(0,1);
+						$taxonomy_check = $query->execute()->fetchField();
+						//drupal_set_message(t('taxonomy_check: @v', array('@v' => $taxonomy_check)));
+//dpm($series_nid);
+						if(!strlen($taxonomy_check)) {
+							// Load the node to be updated
+							$node = node_load($nid);
+							// Insert Channel Taxonomy Term
+							$node->	field_channel[$node->language][]['tid'] = $airlist_taxonomy_keys[0];		
+							// Save the node
+							if($node = node_submit($node)) {
+								node_save($node);
+							}
+						}
+					}
+				}
+			}
+		} elseif($file_type == 'episode') {
+			if(is_numeric($program_id)){
+				// Get the episode nid
+				//$episode_nid = db_query("SELECT entity_id FROM {field_data_field_program_id} WHERE field_program_id_value = :program_id", array(':program_id' => $program_id))->fetchField();
+				$query = db_select('field_data_field_program_id', 'f')
+					->condition('field_program_id_value', $program_id, '=')
+					->fields ('f', array ('entity_id'))
+					->range(0,1);
+				$nid = $query->execute()->fetchField();
+				//drupal_set_message(t('episode_nid: @v', array('@v' => $episode_nid)));
+        //dpm($nid);
+        //dpm($channel);
+
+				// The episode exists
+				if(strlen($nid)) {
+					if($airlist_taxonomy = taxonomy_get_term_by_name($channel,'channel')) {
+            //dpm($airlist_taxonomy);
+						$airlist_taxonomy_keys = array_keys($airlist_taxonomy);
+						//drupal_set_message(t('taxonomy: @v', array('@v' => $airlist_taxonomy_keys[0])));
+            //dpm($airlist_taxonomy_keys[0]);
+
+/*
+$items = field_get_items('node', $node, 'field_channel');
+dpm($items);
+*/
+
+						// Check to see if it already has the connected channel taxonomy
+						$query = db_select('taxonomy_index', 't')
+							->condition('nid', $nid)
+							->condition('tid', $airlist_taxonomy_keys[0])
+							->fields ('t', array ('tid'))
+							->range(0,1);
+						$taxonomy_check = $query->execute()->fetchField();
+						//drupal_set_message(t('taxonomy_check: @v', array('@v' => $taxonomy_check)));
+
+						if(!strlen($taxonomy_check)) {
+              //dpm('taxonomy missing. Update node');
+							// Load the node to be updated
+							$node = node_load($nid);
+              //dpm($node);
+							// Insert Channel Taxonomy Term
+							$node->field_channel[$node->language][]['tid'] = $airlist_taxonomy_keys[0];		
+							// Save the node
+							if($node = node_submit($node)) {
+								//node_save($node);
+							}
+						}
+					}
+				}
+			}
+      //dpm('-----');
+		}
+	//Show your junk
+	//drupal_set_message(t('@', array('@' => $))); //Empty message template
+	//drupal_set_message(t('<strong>@i</strong>', array('@i' => $d)));
+	//drupal_set_message(t('@v', array('@v' => $fulldate)));
+	//drupal_set_message(t('@v', array('@v' => $series_id)));
+	//drupal_set_message(t('@v', array('@v' => $program_id)));
+	//drupal_set_message(t('@v', array('@v' => $version_id)));
+	//drupal_set_message(t('@v', array('@v' => $rebroadcast)));
+	//drupal_set_message(t('@v', array('@v' => $channel)));
+	//drupal_set_message(t('<hr />'));
+}
+
+
+
+//////////////////////
+//////////////////////
+//////////////////////
+//////////////////////
+//////////////////////
+
+
+
+//////////////////////
+//////////////////////
+//////////////////////
+//////////////////////
+//////////////////////
+
+
+
+/**
+ * Form function, called by drupal_get_form()
+ * in protrack_import_menu().
+ */
+function airdates_protrack_import($form_state){
+	$form['airdates_protrack'] = array(
+		'#type' => 'fieldset',
+		'#title' => t('ProTrack Airdates Connect - This function uses the protrack_airlist database.'),
+		'#collapsible' => FALSE,
+		);
+	$form['airdates_protrack']['airdates_import_button'] = array(
+		'#type' => 'submit',
+		'#value' => t('Connect Episodes To Their ProTrack Airdates')
+		);
+  return $form;
+}
+/**
+ * Form function, called by drupal_get_form()
+ * in protrack_import_menu().
+ */
+function publish_protrack_import($form_state){
+	$form['publish_protrack'] = array(
+		'#type' => 'fieldset',
+		'#title' => t('ProTrack Publish Tool - This function fixes unpublished content.'),
+		'#collapsible' => FALSE,
+		);
+	$form['publish_protrack']['publish_import_button'] = array(
+		'#type' => 'submit',
+		'#value' => t('Fix unpublished content')
+		);
+  return $form;
+}
+
+
+/**
+ * Impliment hook_import_form
+ */
+function airdates_protrack_import_form() {
+  return drupal_get_form('airdates_protrack_import');
+}
+
+/**
+ * Impliment hook_import_form
+ */
+function publish_protrack_import_form() {
+  return drupal_get_form('publish_protrack_import');
+}
+
+/**
+ * Impliment hook_submit
+ */
+function airdates_protrack_import_submit($form, &$form_state) {
+	//Here is where we execute the big import
+	episode_airdates_collect();
+}
+/**
+ * Impliment hook_submit
+ */
+function publish_protrack_import_submit($form, &$form_state) {
+	//Here is where we execute the big import
+	//episode_airdates_collect();
+  publish_airdates_collect();
+}
+
+/**
+ * This is where airdates connect publication happens.
+ */
+function publish_airdates_collect() {
+  // define a redirect path upon batch completion
+  $redirect_path = 'admin/config/content/kued/protrack_import/publish';
+
+  // define batch array structure
+  $batch = array(
+    'title' => t('Reading Airlist in order to examine expiration dates.'),
+    'operations' => array(
+    	array('_protrack_import_airlist_publish', array()),
+    ),
+		'finished' => '',
+		'init_message' => t('Starting...'),
+		'progress_message' => t('Batch @current out of @total'),
+		'error_message' => t('An error occurred and some or all of the batch has failed.'),
+  );
+
+  // set batch
+  batch_set($batch);
+  // process batch
+  batch_process($redirect_path);
+}
+
+////////////////////////
+////////////////////////
+////////////////////////
+// This is the Airlist Connect - adds the channel taxonomy to the Series and Episode objects
+function _protrack_import_airlist_publish($source_file, &$context) {
+	require_once(dirname(__FILE__) . '/protrack_import.functions.inc');
+
+	// Get the airlist file - this is going to take a while
+	$file = "airlist.txt";
+	$file_path = drupal_realpath('private://');
+	$data_file = file_create_url($file_path . '/' . $file);
+
+	if (empty($context['sandbox'])) {
+		$context['sandbox']['progress'] = 0;
+		$context['sandbox']['max'] = count(file($data_file));
+		$context['sandbox']['file_pointer_position'] = '';
+		}
+
+  // define batch limit
+  $batch_limit = 50;
+  // assume the batch process has not completed
+  $context['finished'] = 0;
+  // open the file for reading
+  $file_handle = fopen($data_file, 'r');
+
+  // check if file pointer position exists in the sandbox, and jump to location in file
+  if($context['sandbox']['file_pointer_position']) {
+	  fseek($file_handle, $context['sandbox']['file_pointer_position']);
+  }
+
+  // loop through the file and stop at batch limit
+  for ($i = 0; $i < $batch_limit; $i++) {
+    // get file line as csv
+    $file_data_row = fgetcsv($file_handle, 0, "|");
+
+		//Filter out the UEN crap
+		$channel = $file_data_row['5'];
+		if($channel != 'KUEN-DT' && $channel != 'MHZ' && $channel != 'FNX') {
+			// Run the function to import the array
+			if(is_array($file_data_row)) {
+				// Skip the first line
+				if(is_numeric($file_data_row[1])) {
+					airlist_publish($file_data_row);
+				}
+			$context['sandbox']['progress']++;
+			}
+		}
+
+		// Show progress
+		if ($context['sandbox']['progress'] != $context['sandbox']['max']) {
+			$context['finished'] = $context['sandbox']['progress'] / $context['sandbox']['max'];
+			$context['message'] = t('Now processing %v', array('%v' => $context['sandbox']['progress']));
+		}
+
+		// retain current file pointer position
+		$context['sandbox']['file_pointer_position'] = ftell($file_handle);
+
+    // check for EOF
+    if (feof($file_handle)) {
+      // complete the batch process
+      $context['finished'] = 1;
+
+			drupal_set_message(t('<strong>@v</strong> Nodes Published', array('@v' => $context['sandbox']['progress'])));
+
+      // end loop
+      break;
+    }
+  }
+}
+
+
+function airlist_publish($data) {
+  $fulldate = $data[0];
+  $series_id = $data[1];
+  $program_id = $data[2];
+  
+  //dpm($program_id);
+}
+
+
+
+/**
+ * This is where airdates connect magic happens.
+ */
+function episode_airdates_collect($file = '') {
+  // define a redirect path upon batch completion
+  $redirect_path = 'admin/config/content/kued/protrack_import/airdates';
+  $file = "sites/default/files/protrack_import/series.txt";
+  // define batch array structure
+  $batch = array(
+    'title' => t('Reading Airlist and Episodes from the database and adding Airdates to the active Episodes'),
+    'operations' => array(
+    	array('_protrack_import_airlist_incoming_empty', array($file)),
+    	array('_protrack_import_airlist_import', array($file)),
+    	//array('_protrack_import_airdate_connect', array($file)),
+    	array('_protrack_import_airlist_empty', array($file)),
+    ),
+		'finished' => '',
+		'init_message' => t('Starting...'),
+		'progress_message' => t('Batch @current out of @total'),
+		'error_message' => t('An error occurred and some or all of the batch has failed.'),
+  );
+
+  // set batch
+  batch_set($batch);
+  // process batch
+  batch_process($redirect_path);
+}
+
+
+/**
+ * Connect Airdates to the episodes
+ */
+function _protrack_import_airdate_connect(&$context, $file) {
+	//drupal_set_message('_protrack_import_airdate_connect Phase<br />');
+	require_once(dirname(__FILE__) . '/protrack_import.functions.inc');
+
+	// Get the total number of nodes we'll be working with in this batch;
+	$max = db_query("SELECT COUNT(*) FROM {node} WHERE type = 'episode' AND status = '1' LIMIT 25")->fetchField();
+	//drupal_set_message(t('max: @v', array('@v' => $max)));
+
+/*
+	$query = db_select('node', 'm')
+		->condition('type', 'episode', '=')
+		->condition('status', '1', '=')
+		->fields ('m')
+		->range(0,24);
+	$max = $query->execute()->rowCount();
+*/
+
+	if (empty($context['sandbox'])) {
+		$context['sandbox']['progress'] = 0;
+		$context['sandbox']['current'] = 0;
+		$context['sandbox']['max'] = $max;
+	}
+	$limit = 100;
+
+//drupal_set_message(t('Current Node: @v', array('@v' => $context['sandbox']['current'])));
+
+	$result = db_query("SELECT nid, field_program_id_value AS pid FROM {node} LEFT JOIN field_data_field_program_id ON node.nid = field_data_field_program_id.entity_id WHERE nid > :current AND type = 'episode' AND status = '1' ORDER BY nid ASC LIMIT $limit", array(':current' => $context['sandbox']['current']));
+
+//drupal_set_message('<pre>result<br />'.print_r($result, TRUE).'</pre>');
+/*
+	$query = db_select('node', 'n')
+		->condition('nid', $context['sandbox']['current'], '>')
+		->condition('type', 'episode', '=')
+		->condition('status', '1', '=')
+		->leftJoin('field_data_field_program_id ON node.nid = field_data_field_program_id.entity_id')
+		->orderBy('n', 'ASC')
+		->range(0, $limit)
+		->fields ('pid', array ('nid', 'field_program_id_value', 'bundle'));
+	$result = $query->execute()->fetchAssoc();
+
+$context['message'] = t('<pre>result<br />'.print_r($result, TRUE).'</pre><hr />');
+*/
+
+	//$result = db_query("SELECT nid, field_program_id_value AS pid FROM {node} LEFT JOIN {field_data_field_program_id} ON node.nid = field_data_field_program_id.entity_id WHERE nid = '10380' AND type = 'episode' AND status = '1' ORDER BY nid ASC LIMIT $limit");
+
+	// Now cycle through the results
+	foreach($result as $row) {
+    //drupal_set_message('<pre>row: '.print_r($row, TRUE).'</pre>');
+    //drupal_set_message(t('nid: @v', array('@v' => $row->nid)));
+  
+    // Remove current items
+    $num_deleted = db_delete('field_data_field_episode_airdates')
+      ->condition('entity_id', $row->nid)
+      ->execute();
+  
+    // Remove revision items
+    $num_deleted = db_delete('field_revision_field_episode_airdates')
+      ->condition('entity_id', $row->nid)
+      ->execute();
+  
+    // Get the episode length
+    //$length = length_to_seconds(db_query("SELECT field_episode_length_value FROM {field_data_field_episode_length} WHERE entity_id = :nid", array(':nid' => $row->nid))->fetchField());
+    $query = db_select('field_data_field_episode_length', 'f')
+      ->condition('entity_id', $row->nid, '=')
+      ->fields ('f', array ('field_episode_length_value'));
+      $length = $query->execute()->fetchField();
+  
+    $update = db_select('protrack_airlist')
+      ->fields('protrack_airlist', array('fulldate'))
+      ->condition('program_id', $row->pid)
+      ->orderBy('fulldate')
+      ->execute();
+  
+      $a = 0;
+      foreach($update as $update_row) {
+        //drupal_set_message('<pre>length: '.print_r($length, TRUE).'</pre>');
+        $length = length_to_seconds($length);
+        $start_time = strtotime($update_row->fulldate);
+        $end_time = $start_time + $length;
+    
+        //drupal_set_message('<pre>start_time: '.print_r($start_time, TRUE).'</pre>');
+        //drupal_set_message('<pre>end_time: '.print_r($end_time, TRUE).'</pre>');
+  
+        // Write the new data, faster than opening the node and saving it.
+        $airdates = array(
+          'entity_type' => 'node',
+          'bundle' => 'episode',
+          'entity_id' => $row->nid,
+          'revision_id' => $row->nid,
+          'language' => 'und',
+          'delta' => $a,
+          'field_episode_airdates_value' => $start_time,
+          'field_episode_airdates_value2' => $end_time,
+        );
+  
+        $update_data = db_insert('field_data_field_episode_airdates')
+          ->fields($airdates)
+          ->execute();
+        
+        $update_revision = db_insert('field_revision_field_episode_airdates')
+          ->fields($airdates)
+          ->execute();
+  
+  /*
+            $context['message'] = t('<pre>nid<br />'.print_r($row->nid, TRUE).'</pre><hr />');
+            $context['message'] = t('<pre>length<br />'.print_r($length, TRUE).'</pre><hr />');
+            $context['message'] = t('<pre>end_time<br />'.print_r($end_time, TRUE).'</pre><hr />');
+            $context['message'] = t('<pre>update_row<br />'.print_r($update_row, TRUE).'</pre><hr />');
+  */
+          $a++;
+  //drupal_set_message('<hr />');
+        }
+    
+        //$context['sandbox']['current'] = $row->nid; // Why doesn't this fucking work?
+  
+        $context['message'] = t('Now Processing: @p of @m (@c)', array('@p' => $context['sandbox']['progress'], '@m' => $context['sandbox']['max'], '@c' => $context['sandbox']['current']));
+        $context['sandbox']['progress']++;
+        
+        //$context['message'] = t('Now Processing: @v with a program_id of @pid (@p of @m)', array('@v' => check_plain($node->title), '@p' => $context['sandbox']['progress'], '@m' => $context['sandbox']['max'], '@pid' => $row->pid));
+      }
+  
+        $context['sandbox']['current'] = '';
+        $context['sandbox']['current'] = $row->nid; // Why doesn't this fucking work?
+  
+    if ($context['sandbox']['progress'] != $context['sandbox']['max']) {
+      $context['finished'] = $context['sandbox']['progress'] / $context['sandbox']['max'];
+    }
+  
+  
+  
+  // Total entries in the airlist	
+  //SELECT COUNT(*) FROM `protrack_airlist`;
+  
+  // Step 1: Check for any unpublished nodes that still have airdates (spring cleaning)
+  // Step 2: Collect all nodes and program ids - Episodes are connected to Airdates
+  //SELECT nid, type, status, field_program_id_value FROM `node` LEFT JOIN field_data_field_program_id ON node.nid = field_data_field_program_id.entity_id WHERE type = 'episode' AND status = '1' ORDER BY field_program_id_value
+  // Step 3: Open the node and remove the current airdates
+  // Step 4: Inject the new airdates
+  // Step 5: Save and close the node
+  
+  /*
+  $context['sandbox']['position'] = $context['sandbox']['position'] + $context['sandbox']['progress'];
+  
+  drupal_set_message(t('Position: @v', array('@v' => $context['sandbox']['position'])));
+  drupal_set_message(t('Max: <strong>@v</strong>', array('@v' => $context['sandbox']['max'])));
+  
+  drupal_set_message(t('Finished: <strong>@v</strong>', array('@v' => $context['finished'])));
+  //drupal_set_message(t('Message: <strong>@v</strong>', array('@v' => $context['message'])));
+  
+  drupal_set_message(t('Position: @v', array('@v' => $context['sandbox']['position'])));
+  */
+
+}
+
+
+/**
+ * Test the batch
+ */
+function batch_test_finished($success, $results, $operations) {
+  // The 'success' parameter means no fatal PHP errors were detected. All
+  // other error management should be handled using 'results'.
+  if ($success) {
+    $message = format_plural(count($results), 'One Episodes processed.', '@count Episodes processed.');
+  }
+  else {
+    $message = t('Finished with an error.');
+  }
+  drupal_set_message($message);
+  // Providing data for the redirected page is done through $_SESSION.
+  foreach ($results as $result) {
+    $items[] = t('Loaded node %title.', array('%title' => $result));
+  }
+  $_SESSION['my_batch_results'] = $items;
+}
+
+
+
+//////////////////////
+//////////////////////
+//////////////////////
+//////////////////////
+//////////////////////
+
+// All processing functions moved to protrack_import.functions.inc
+
+////////////////////////
+////////////////////////
+////////////////////////
+// NOT USED RIGHT NOW
+function airlist_protrack_prepare($file_data_row) {
+
+	//First setup count
+	$n = 0; // New Nodes count
+
+	//Assign some variables for the import
+/*
+	$fulldate = t('@fulldate', array('@fulldate' => $file_data_row[0])); // text
+	$series_id = t('@series_id', array('@series_id' => $file_data_row[1])); // reference
+	$program_id = t('@program_id', array('@program_id' => $file_data_row[2])); // reference
+	$version_id = t('@version_id', array('@version_id' => $file_data_row[3])); // reference
+	$rebroadcast = t('@rebroadcast', array('@rebroadcast' => $file_data_row[4])); //text
+	$channel = t('@channel', array('@channel' => $file_data_row[5])); // taxonomy
+*/
+
+	// Assign some variables for the import	
+	$fulldate = $file_data_row[0]; // text
+	$series_id = $file_data_row[1]; // reference
+	$program_id = $file_data_row[2]; // reference
+	$version_id = $file_data_row[3]; // reference
+	$rebroadcast = $file_data_row[4]; //text
+	$channel = $file_data_row[5]; // taxonomy
+
+	// Find Series Node Reference
+	//$series_node_ref = db_query("SELECT entity_id FROM {field_data_field_series_id} WHERE field_series_id_value = :series_id", array(':series_id' => $series_id))->fetchField();	// Connect the Airlist to the Series
+	$query = db_select('field_data_field_series_id', 'f')
+		->condition('field_series_id_value', $series_id, '=')
+		->fields ('f', array ('entity_id'));
+	$series_node_ref = $query->execute()->fetchField();
+
+	// Find Program Node Reference
+	//$program_node_ref = db_query("SELECT entity_id FROM {field_data_field_program_id} WHERE field_program_id_value = :program_id", array(':program_id' => $program_id))->fetchField();	// Connect the Airlist to the Program
+	$query = db_select('field_data_field_program_id', 'f')
+		->condition('field_program_id_value', $program_id, '=')
+		->fields ('f', array ('entity_id'));
+	$program_node_ref = $query->execute()->fetchField();
+	
+	// Find Program Node Reference
+	//$version_node_ref = db_query("SELECT entity_id FROM {field_data_field_version_id} WHERE field_version_id_value = :version_id", array(':version_id' => $version_id))->fetchField();	// Connect the Airlist to the Version
+	$query = db_select('field_data_field_version_id', 'f')
+		->condition('field_version_id_value', $version_id, '=')
+		->fields ('f', array ('entity_id'));
+	$version_node_ref = $query->execute()->fetchField();
+
+/*
+	// Check to see if this series_id already exists, get the entity_id
+	$result = db_query("SELECT entity_id, entity_type, bundle FROM {field_data_field_series_id} WHERE field_series_id_value = :series_id", array(':series_id' => $series_id,));
+	$record = $result->fetchAssoc();
+*/
+
+	//Begin the node import process
+	$node = new stdClass(); // Create a new node object
+	$node->type = "airlist"; // Or page, or whatever content type you like
+	node_object_prepare($node); // Set some default values
+	 
+	$node->title = $fulldate;
+	$node->language = 'und'; // Or e.g. 'en' if locale is enabled
+		
+	//uid associated with this node
+	$node->uid = 1; // UID of the author of the node; or use $node->name
+
+	// References
+	// Insert Series Reference
+	if(strlen($series_node_ref)) {
+		$node->field_airlist_series[$node->language][0]['nid'] = $series_node_ref;
+	}
+	// Insert Program Reference
+	if(strlen($program_node_ref)) {
+		$node->field_airlist_program[$node->language][0]['nid'] = $program_node_ref;
+	}	
+	// Insert Version Reference
+	if(strlen($version_node_ref)) {
+		$node->field_airlist_version[$node->language][0]['nid'] = $version_node_ref;
+	}
+
+	// Insert Rebroadcast
+	if(strlen($rebroadcast)) {
+		$node->field_airlist_rebroadcast[$node->language][0]['value'] = $rebroadcast;
+	}
+
+	// Insert Channel Taxonomy Term
+	if($airlist_taxonomy = taxonomy_get_term_by_name($channel)) {
+		$airlist_taxonomy_keys = array_keys($airlist_taxonomy);
+		$node->	field_airlist_channel[$node->language][]['tid'] = $airlist_taxonomy_keys[0];
+	}
+
+	//Save the node!
+	if($node = node_submit($node)) {
+		node_save($node);
+		//$n++;
+	}
+
+	//Show your junk
+	//drupal_set_message(t('@', array('@' => $))); //Empty message template
+	//drupal_set_message(t('<strong>@i</strong>', array('@i' => $d)));
+	//drupal_set_message(t('@v', array('@v' => $fulldate)));
+	//drupal_set_message(t('@v', array('@v' => $series_id)));
+	//drupal_set_message(t('@v', array('@v' => $program_id)));
+	//drupal_set_message(t('@v', array('@v' => $version_id)));
+	//drupal_set_message(t('@v', array('@v' => $rebroadcast)));
+	//drupal_set_message(t('@v', array('@v' => $channel)));
+	//drupal_set_message(t('<hr />'));
+}
+
+
+////////////////////////
+////////////////////////
+////////////////////////
+// NOT USED RIGHT NOW!!!!!!!!!
+//Function for creating the main Episode Version data
+function episode_version_create($episode_program_id, $episode_version_id, $episode_title, $episode_length, $episode_number, $episode_rating, $episode_caption, $episode_dvs, $episode_stereo_formatted, $episode_hdtv, $episode_letterbox_formatted, $episode_language_formatted, $node_ref, $uid, $series_title) {
+
+	//First setup count
+	$n=0; //New Nodes count
+	$u=0; //Updated Nodes count
+	$t=0; //Terms Added count
+	$l=0; //Locked Nodes count
+	$d=0; //Duplicate Nodes count
+
+	//NOTE if the Episode page doesn't exist DON'T create the Episode Version node
+	//Insert Node Reference
+	$query = db_select('field_data_field_program_id', 'f')
+		->condition('field_program_id_value', $episode_program_id, '=')
+		->fields ('f', array ('entity_id'));
+	$node_ref = $query->execute()->fetchField();
+
+	//Connect the Episode to the Series
+	if(strlen($node_ref)) {
+
+	//Begin the node import process
+	$node = new stdClass(); // Create a new node object
+	$node->type = "episode_version"; // Or page, or whatever content type you like
+	node_object_prepare($node); // Set some default values
+
+	//Show the episode_version_id in the title	
+	if(strlen($series_title)) {
+		$episode_title = t('@series_title @episode_version_id', array('@series_title' => $series_title, '@episode_version_id' => $episode_version_id));
+		} else {
+		$episode_title = t('@episode_title @episode_version_id', array('@episode_title' => $episode_title, '@episode_version_id' => $episode_version_id));
+		//$episode_title = t('@episode_title', array('@episode_title' => $episode_title));
+		}
+			$episode_title = reverse_html($episode_title);
+			$episode_title = protrack_import_fix_title($episode_title);
+
+	$node->title = $episode_title;
+
+	//$node->language = $episode_language_formatted;
+	$node->language = $episode_language_formatted;
+
+	//Now insert the node reference
+	$node->field_series_link[$node->language][0]['target_id'] = $node_ref;
+//drupal_set_message('version_create phase<br />');
+//drupal_set_message('<pre>version_create:<br />'.print_r($node, TRUE).'</pre>');
+
+
+	//uid associated with this node
+	$node->uid = 1; // UID of the author of the node; or use $node->name
+
+	//Insert Version ID
+	if(strlen($episode_version_id)) {
+		$node->	field_version_id[$node->language][0]['value'] = $episode_version_id;
+	}
+	//Insert Number
+	if(strlen($episode_number)) {
+		$node->	field_episode_number[$node->language][0]['value'] = $episode_number;
+	}
+	//Insert Episode Length
+	if(strlen($episode_length)) {
+		$node->field_episode_length[$node->language][0]['value'] = $episode_length;
+	}
+
+	//Boolean Fixes
+	//Insert Episode Caption (on/off)
+	if($episode_caption == 'CC') {
+		$node->	field_episode_caption[$node->language][0]['value'] = 1;
+	}
+	//Insert Episode DVS (on/off)
+	if($episode_dvs == 'DVS') {
+		$node->	field_episode_dvs[$node->language][0]['value'] = 1;
+	}
+	//Insert Episode HDTV (on/off)
+	if($episode_hdtv == 'HDTV') {
+		$node->	field_episode_hdtv[$node->language][0]['value'] = 1;
+	}
+
+	//Taxonomy fixes
+	//Insert Episode Rating Term
+	if($episode_rating_tid = taxonomy_get_term_by_name($episode_rating)) {
+			$episode_rating_keys = array_keys($episode_rating_tid);
+			$node->field_episode_rating[$node->language][0]['tid'] = $episode_rating_keys[0];
+	}
+	//Insert Episode Letterbox Term
+	if($episode_letterbox_tid = taxonomy_get_term_by_name($episode_letterbox_formatted)) {
+			$episode_letterbox_formatted_keys = array_keys($episode_letterbox_tid);
+			$node->field_episode_letterbox[$node->language][0]['tid'] = $episode_letterbox_formatted_keys[0];
+	}
+	//Insert Episode Stereo Term
+	if($episode_stereo_tid = taxonomy_get_term_by_name($episode_stereo_formatted)) {
+			$episode_stereo_formatted_keys = array_keys($episode_stereo_tid);
+			$node->field_episode_stereo[$node->language][0]['tid'] = $episode_stereo_formatted_keys[0];
+	}
+
+//drupal_set_message('<pre>node 2:<br />'.print_r($node, TRUE).'</pre>');
+
+	//Save the new node!
+	if($node = node_submit($node)) {
+		node_save($node);
+		//Count the number of nodes saved
+		$n++;
+	}
+
+	//END Reference check
+	}
+//END Episode Create
+}

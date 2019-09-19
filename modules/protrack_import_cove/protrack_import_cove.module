@@ -1,0 +1,440 @@
+<?php
+
+
+/**
+* Implements hook_menu().
+*/
+/*
+function protrack_import_cove_menu() {
+  $items = array(); 
+
+  $items['admin/config/content/kued/protrack_import/cove'] = array(
+    'title' => 'COVE Video Import',
+    'description' => 'Connect ProTrack episodes to COVE videos.',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('cove_protrack_import_form'),
+    'access arguments' => array('administer protrack'),
+		//'tab_root' => 'admin/config/content/kued/protrack_import/series',
+    //'tab_parent' => 'admin/config/content/kued/protrack_import/',
+		'type' => MENU_LOCAL_TASK,
+    'weight' => 15,
+  );
+
+  return $items;
+} 
+
+
+function cove_protrack_import_form() {
+	//$vid = video_protrack_run($video_title, $episode_title, $nid, $series_title, $node_ref); // Return an array of videos that were created
+	//$dir = "sites/default/files/protrack_import/";
+	//$series_file = "series-small.txt";
+	$file = "episode.txt";
+	$file_path = drupal_realpath('private://');
+	$file_location = file_create_url($file_path . '/' . $file);
+	//$series_file_location = "$dir"."$series_file";
+
+	$form['cove_protrack'] = array(
+	  '#type' => 'fieldset',
+	  '#title' => t('COVE Video Import'),
+	  '#weight' => 5,
+	  '#collapsible' => FALSE,
+	  '#collapsed' => FALSE,	
+		);
+	$form['cove_protrack']['file'] = array(
+		'#type' => 'textfield',
+		'#title' => t('File to Import:'),
+		'#default_value' => $file_location,
+		'#size' => 100,
+		'#attributes' => array('readonly' => 'readonly'),
+		);
+	$form['cove_protrack']['markup'] = array(
+		'#type' => 'markup',
+		'#markup' => t('This process reads the current Episode.txt file and searches the COVE database for connections. Warning, this process takes hours to complete and should only be run once a week at most.'),
+		);
+
+	$form['cove_protrack']['cove_import_button'] = array(
+		'#type' => 'submit',
+		'#value' => t('Import COVE Videos')
+		);
+
+
+
+  return $form;
+}
+*/
+/**
+ * Impliment hook_submit
+ */
+ /*
+function cove_protrack_import_form_submit($form, &$form_state) {
+	// Flag the source of this episode import
+	variable_set('protrack_import_cove', 1);
+
+	//Get the file
+	$file = $form_state['values']['file'];
+	//Here is where we execute the big import	
+	episode_protrack_collect($file);
+}
+*/
+
+
+
+
+
+//Function for adding the Episode ID
+function cove_video_add($episode_program_id, $episode_version_id, $episode_title, $episode_guide, $episode_description, $episode_length, $episode_number, $episode_rating, $episode_caption, $episode_dvs, $episode_stereo_formatted, $episode_hdtv, $episode_letterbox_formatted, $episode_language_formatted, $node_ref, $uid, $series_title, $video_title) {
+// 1 Open newly created node.
+// 2 Check for differing/better data and update
+// 3 Add version_id
+// 4 Save node
+
+	// Get the nid
+	$query = db_select('field_data_field_program_id', 'f')
+		->condition('field_program_id_value', $episode_program_id, '=')
+		->fields ('f', array ('entity_id'));
+	$nid = $query->execute()->fetchField();
+
+	//drupal_set_message('video check');
+	//drupal_set_message('<pre>node_ref: '. $node_ref. '</pre>');
+	//drupal_set_message('<pre>series_title: '. $series_title. '</pre>');
+	//$vid = video_protrack_run($video_title, $episode_title, $nid, $series_title, $node_ref); // Return an array of videos that were created
+	//drupal_set_message('<pre>vid - send to episode: '. print_r($vid, TRUE) . '</pre><hr />');
+
+
+
+	////////////////////
+	////////////////////
+
+/*
+	// We need to see if the version is already attached.  If it is skip all of this!
+	$query = db_select('field_data_field_version_id', 'f')
+		->condition('field_version_id_value', $episode_version_id, '=')
+		->condition('entity_id', $nid, '=')
+		->fields ('f', array ('entity_id'));
+	$episode_version_id_check = $query->execute()->fetchField();
+
+	if(!strlen($episode_version_id_check)) {
+
+		// Load the node to be updated
+		$node = node_load($nid);
+	
+			// Insert Version ID(s)
+			if(strlen($episode_version_id)) {
+				$node->	field_version_id[$node->language][]['value'] = $episode_version_id;
+			}
+	
+			// Now make sure we have the best info available for this episode
+	
+			// The Guide info is often missing, if this record has a guide let's add it if the original is missing.
+			if($episode_guide) {
+				//drupal_set_message('<pre>New guide info found!</pre>');
+				// Check to see if the current guide is empty, if so fill it with the new data.
+				if(!isset($node->field_episode_guide[$node->language][0]['value'])) {
+				$node->field_episode_guide[$node->language][0]['value'] = $episode_guide;
+				}
+			}
+
+		if($node = node_submit($node)) { // Prepare node for saving
+				node_save($node);
+				$nid = $node->nid;
+		}
+	}
+	return $nid;
+*/
+}
+
+//////////////////////
+//////////////////////
+//////////////////////
+//////////////////////
+//////////////////////
+
+
+
+// Steps:
+// 1 check for existing video
+// 2 create video & attach to node and series
+// 3 update video if already exists
+function video_protrack_run($episode_title, $episode_reference, $series_title, $series_reference, $video_title){
+	//drupal_set_message(t('Module Exists<br />'));
+
+	// include the API function
+	if(module_load_include('inc', 'protrack_import_cove', 'protrack_import.cove_api.functions')){
+		//drupal_set_message(t('Functions Loaded<br />'));
+	
+		// Setup the COVE API request
+		$api_id = 'KUED-ba759e97-4109-49ed-974b-3741d6cddcf2';
+		$api_secret = '1988a78a-b478-4853-a4f1-4bba9cac4096';
+		$search = $video_title;
+		$requestor = new COVE_API_Request($api_id, $api_secret);
+	
+		$api_url = 'http://api.pbs.org/cove/v1/';
+		$api_method = 'videos';
+		$api_producer_name = 'PBS';
+		$api_programid = '';
+		//$api_title_encode = rawurlencode($search);
+		$api_fields = '&fields=associated_images';
+		$api_available = '&filter_availability_status=Available';
+		$api_type = '&filter_type=Episode';
+		$api_orderby = '&order_by=type,airdate';
+		$api_title = '&filter_title__in=' . $search;
+		$api_query_url = $api_url . $api_method . '/?filter_producer__name=' . $api_producer_name . $api_title . $api_fields . $api_available . $api_orderby . $api_programid . $api_type;
+	
+		//drupal_set_message('Sent api_query_url: ' . $api_query_url);
+	
+		// Make the request to the COVE API
+		$request_data = $requestor->make_request($api_query_url);
+		// Decode the data
+		$cove_data = drupal_json_decode($request_data->{'data'});
+		// If nothing was returned then return
+			if ($cove_data['count'] == 0) {
+				return;
+			} else {
+				//drupal_set_message('<pre><h2>returned object:</h2>' . print_r($cove_data['results'], TRUE) . '</pre><hr />');
+				// Looks like we're good so create the object here.
+				foreach($cove_data['results'] as $video) {
+					$video['episode_title'] = $episode_title;
+					$video['episode_reference'] = $episode_reference;
+					$video['series_title'] = $series_title;
+					$video['series_reference'] = $series_reference;
+					
+					$nid[] = video_protrack_prepare($video, $episode_title, $episode_reference, $series_title, $series_reference);
+			}		
+		}
+	}
+	return $nid;
+}
+
+////////////////////
+function video_protrack_prepare($video) {
+	
+	$language_formatted = 'und'; // Let's just make everything undetermined, sadly.
+
+	$query = new EntityFieldQuery();
+	$query->entityCondition('entity_type', 'node')
+	  ->entityCondition('bundle', 'video')
+	  ->propertyCondition('title', $video['title'])
+	  ->range(0, 1);
+	$result = $query->execute();
+	
+	//drupal_set_message('<pre><h2>field query:</h2>' . print_r($result, TRUE) . '</pre>');
+	
+	if(empty($result)){
+		//drupal_set_message('<pre><h2>Video:</h2>' . print_r($video, TRUE) . '</pre>');
+		drupal_set_message('<pre>Video: <strong>' . $video['title'] . '</strong></pre><br />');
+
+		//Begin the node import process
+		$node = new stdClass(); // Create a new node object
+		$node->type = "video"; // Or series, or whatever content type you like
+		node_object_prepare($node); // Set some default values
+	
+		//uid associated with this node
+		$node->uid = 1; // UID of the author of the node; or use $node->name
+		//Set the title
+		$node->title = $video['title'];
+		//$node->language = $language_formatted;
+		$node->language = $language_formatted;
+
+		//Now insert the series reference
+		if($video['series_reference']) {
+			$node->field_series_link[$node->language][0]['target_id'] = $video['series_reference'];
+		}
+		//Now insert the episode reference
+		if($video['episode_reference']) {
+			$node->field_episode_cross_link[$node->language][0]['target_id'] = $video['episode_reference'];
+		}
+
+		//Fix the guide
+		if(strlen($video['short_description'])) {
+			$short_description = reverse_html(t('@short_description', array('@short_description' => $video['short_description'])));
+			//$episode_guide = reverse_html($episode_guide);
+		} else {
+			$short_description = '';
+		}
+	
+		//Fix the description
+		if(strlen($video['long_description'])) {
+			$long_description = reverse_html(t('@long_description', array('@long_description' => $video['long_description'])));
+			//$episode_description = reverse_html($episode_description);
+		} else {
+			$long_description = '';
+		}
+
+/*
+		//If there is no guide use the episode_description
+		if(empty($short_description)) {
+			//$episode_guide = truncate_utf8($episode_description, 40, $wordsafe = TRUE, $add_ellipsis = TRUE, $min_wordsafe_length = 30);
+			$episode_guide = $episode_description;
+		}
+		//If there is no description use the episode_guide
+		if(empty($episode_description)) {
+			$episode_description = $short_description;
+		}
+*/
+
+
+//////////////////////////////
+////////////////////////
+///////////////
+///////////////////
+//////////////////
+
+		if($video['associated_images'][0]['type']['usage_type']['Mezzanine']) {
+
+			$image_url = $video['associated_images'][0]['url'];
+			//drupal_set_message('<pre><h2>image_url:</h2>' . print_r($image_url, TRUE) . '</pre>');
+			$directory = file_build_uri('media/video');
+			//drupal_set_message('<pre><h2>directory:</h2>' . print_r($directory, TRUE) . '</pre>');
+			if (!file_prepare_directory($directory, FILE_CREATE_DIRECTORY)) {
+				// If our directory doesn't exist and can't be created, use the default.
+				$directory = NULL;
+				//drupal_set_message('<pre><h2>failed to create directory</h2></pre>');
+			}
+
+//$image = file_get_contents($image_url);
+//$image = file_save_data($image, $directory, FILE_EXISTS_REPLACE);
+
+			$image = system_retrieve_file($image_url, $directory, TRUE, FILE_EXISTS_REPLACE);
+			//drupal_set_message('<pre><h2>image:</h2>' . print_r($image, TRUE) . '</pre>');
+			if($image){
+				file_usage_add($image, 'protrack_import_cove', 'node', $node->uid);
+//$node->field_image[$node->language][0] = $image;
+
+				$node->field_image['und'][0] = array(
+					'fid' => $image->fid,
+					//'title' => basename($image),
+					//'filepath' => $image,
+					'filesize' => $image->filesize,
+					'filename' => $image->filename,
+					'filemime' => $image->filemime,
+					'uri' => $image->uri,
+					'uid' => $node->uid,
+					'status' => 1,
+					'display' => 1,
+				);
+/*
+$node->field_image['und'][0]['field_episode_header_image_fid'] = $image-fid;
+$node->field_image['und'][0]['entity_id'] = $node->nid;
+$node->field_image['und'][0]['field_episode_header_image_fid'] = $image-fid;
+$node->field_image['und'][0]['field_episode_header_image_fid'] = $image-fid;
+*/
+			}
+			} else {
+		}
+
+		//Insert Summary
+		if(strlen($short_description)) {
+			//$node->field_description[$node->language][0]['value'] = $short_description;
+			//$node->body->summary->set(array('value' => $short_description));
+			$node->body[$node->language][0]['summary'] = $short_description;
+		}
+		//Insert Description
+		if(strlen($long_description)) {
+			//$node->body[$node->language][0]['value'] = $long_description;
+			$node->body[$node->language][0]['value'] = $long_description;
+			//$node->body->set(array('value' => $long_description));
+		}
+
+		$node->body[$node->language][0]['format'] = 'full_html';
+
+		//Insert Rating Term
+		$video['rating'] = strtoupper(str_replace('-', '', $video['rating'])); // Remove the hyphen to play well with my taxonomy
+		if($rating_tid = taxonomy_get_term_by_name($video['rating'])) {
+			$rating_keys = array_keys($rating_tid);
+			$node->field_episode_rating[$node->language][0]['tid'] = $rating_keys[0];
+		}
+		//Insert COVE Video ID
+		if(strlen($video['tp_media_object_id'])) {
+			$node->field_cove_video_id[$node->language][0]['value'] = $video['tp_media_object_id'];
+		}
+		//Insert embed flag
+		if($video['allow_embed'] == 1) {
+			$node->field_cove_embed[$node->language][0]['value'] = 1;
+		} else {
+			//$node->field_cove_embed[$node->language][0]['value'] = 0;
+			$node->field_cove_embed[$node->language][0]['value'] = 1;
+		}
+		// Insert Episode page link
+		if($video['episode_url']) {
+			$node->field_sponsor_url[$node->language][0]['url'] = $video['episode_url'];
+			$node->field_sponsor_url[$node->language][0]['title'] = $video['title'];
+		}
+		//Insert Copyright
+		if(strlen($video['copyright'])) {
+			$video['copyright'] = t($video['copyright']);
+			$node->field_copyright[$node->language][0]['value'] = $video['copyright'];
+		}
+		//Insert Transcript Link
+		if(strlen($video['transcript_url'])) {
+			$node->field_url[$node->language][0]['value'] = $video['transcript_url'];
+		}
+
+		if(strlen($video['available_datetime'])) {
+			$node->field_original_airdate[$node->language][0]['value'] = strtotime($video['available_datetime']);
+		}
+
+		// Insert Update Time
+		$node->created = REQUEST_TIME;
+		if($video['record_last_updated_datetime'] != 'None' && $video['record_last_updated_datetime'] != '') {
+			$video_update = $video['record_last_updated_datetime'];
+			$video_update = strtotime($video_update);
+			// if the update is in the past that could be trouble, check it
+			if($video_update > REQUEST_TIME) {
+				$node->changed = $video_update;
+			} else {
+				$node->changed = REQUEST_TIME;
+			}
+		} else {
+			$node->changed = REQUEST_TIME;	
+		}
+		// Generic Status settings
+		$node->status = 1;
+		$node->promote = 0;
+		$node->revision = 0;
+
+		//Save the new node!
+		if($node = node_submit($node)) {
+		//drupal_set_message(t('made it'));
+			node_save($node);
+			$nid = $node->nid;
+		}
+
+		// Now that the Node is created we can handle the unschedule portion
+		if($video['available_datetime'] != 'None' && $video['available_datetime'] != ''){
+			$video_available = strtotime($video['available_datetime']);
+			if($video_available > REQUEST_TIME) {
+			//$video_available = $video_available;
+			//drupal_set_message('<pre>video_available1: '.print_r($video['available_datetime'], TRUE).'</pre>');
+			//drupal_set_message('<pre>video_available2: '.print_r($video_available, TRUE).'</pre>');
+			$publish = array(
+				'nid' => $nid,
+				'publish_on' => $video_available,
+				);
+			db_insert('scheduler')
+				->fields($publish)
+				->execute();
+			}
+		}
+
+		// Now that the Node is created we can handle the unschedule portion
+		if($video['expire_datetime'] != 'None' && $video['expire_datetime'] != ''){
+			$video_expire = strtotime($video['expire_datetime']);
+			//$video_expire = $video_expire;
+			//drupal_set_message('<pre>video_expire1: '.print_r($video['expire_datetime'], TRUE).'</pre>');
+			//drupal_set_message('<pre>video_expire2: '.print_r($video_expire, TRUE).'</pre>');
+			$expire = array(
+				'nid' => $nid,
+				'unpublish_on' => $video_expire,
+				);
+			db_insert('scheduler')
+				->fields($expire)
+				->execute();
+		}
+	} else {
+		//drupal_set_message('<pre><h2>Update the node:</h2>' . print_r($result, TRUE) . '</pre><hr />');
+		//$node = node_load(array('title' => 'node title', 'type' => 'page'));
+	}
+	return $nid;
+}
+
+

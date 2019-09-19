@@ -1,0 +1,24 @@
+; $Id:$
+name = ProTrack Import Cove Video
+description = Creates nodes for Cove video assets and connects them to Episodes in our playlist.
+package = KUED Modules
+core = 7.x
+files[] = protrack_import_cove.module
+files[] = protrack_import_cove_api.functions.inc
+
+dependencies[] = node
+dependencies[] = field
+dependencies[] = number
+dependencies[] = taxonomy
+dependencies[] = references
+dependencies[] = entity
+dependencies[] = entityreference
+dependencies[] = cer
+dependencies[] = pathauto
+dependencies[] = protrack_import
+
+; Information added by drupal.org packaging script on 2013-03-01
+version = "7.x-1.0-dev"
+core = "7.x"
+project = "protrack_import_cove"
+datestamp = "1294805790"
