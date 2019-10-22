@@ -1,15 +1,14 @@
 <?php
+
 /**
 * Implementation of hook_cron_queue_info()
 */
 function protrack_import_cron_queue_info() {
 	// Airlist
-
 	$queues['protrack_import_airlist'] = array(
 		'worker callback' => 'protrack_import_airlist',
 		'time' => 800,
 		);
-
 	// Series
 	$queues['protrack_import_series'] = array(
 		'worker callback' => 'protrack_import_series',
@@ -20,7 +19,6 @@ function protrack_import_cron_queue_info() {
 		'worker callback' => 'protrack_import_episode',
 		'time' => 800,
 		);
-
 	// Airlist Connect
 	$queues['protrack_import_airlist_connect'] = array(
 		'worker callback' => 'protrack_import_airlist_connect',
@@ -31,14 +29,13 @@ function protrack_import_cron_queue_info() {
 	$queues['protrack_import_airdates_connect'] = array(
 		'worker callback' => 'protrack_import_airdates_connect',
 		'time' => 800,
-		);        */
-
+		);
+*/
 	// Close Queues
 	$queues['protrack_import_end_queue'] = array(
 		'worker callback' => 'protrack_import_end_queue',
 		'time' => 800,
 		);
-	//drupal_set_message(print_r($queues, TRUE));
 	return $queues;
 }
 
@@ -46,7 +43,6 @@ function protrack_import_cron_queue_info() {
  * Implements hook_cron().
  */
 function protrack_import_automation_cron() {
-  //dsm('run cron');
 	// Get the lists
 	$import_list = protrack_import_automation_import_check_one();
 
@@ -56,19 +52,11 @@ function protrack_import_automation_cron() {
   //$import_list['series'] = 1;
   //$import_list['episode'] = 1;
 
-	//dpm($import_list);
 	if(!empty($import_list)){
-		//dpm('wtf');
-	}
-//unset($import_list);
-	if(!empty($import_list)){
-		//drupal_set_message('import list is populated.  proceed with loading up the queues');
-	
 		// Flag Automation Start
 		$run_id = db_insert('kued_automation')
 			->fields(array('run_date_start' => strtotime('now'), 'run_active' => 1))
 			->execute();
-		//drupal_set_message('new run_id: '.$run_id);
 
 		////////////////////////
 		//Airlist import queue//
@@ -78,7 +66,6 @@ function protrack_import_automation_cron() {
 			$items = airlist_import_prepare();
 			$items_count = count($items) - 1;
 			$i = 0;
-			//drupal_set_message('<pre>items_count - ' . $items_count . '</pre>');
 			// Create the Queue
 			$queue = DrupalQueue::get('protrack_import_airlist');
 			foreach($items as $item) {
@@ -86,7 +73,6 @@ function protrack_import_automation_cron() {
 				if($i == 0) { $queue->createItem('airlist_start'); }
 				// Add items to the Queue
 				if($i >= 1) {
-					//$queue->createItem('airlist_import');
 					$queue->createItem($item);
 				}
 				// 1 - If we're at the end then empty the airlist table
@@ -108,7 +94,6 @@ function protrack_import_automation_cron() {
 			$items = series_import_prepare();
 			$items_count = count($items) - 1;
 			$i = 0;
-			//drupal_set_message('<pre>items_count - ' . $items_count . '</pre>');
 			// Create the Queue
 			$queue = DrupalQueue::get('protrack_import_series');
 			foreach($items as $item) {
@@ -129,12 +114,11 @@ function protrack_import_automation_cron() {
 		if(!empty($import_list['episode'])) {
 			// Include the Protrack Import functions inc file
 			module_load_include('inc', 'protrack_import', 'protrack_import.episode.functions');
-	
-			//drupal_set_message('<pre>episode import phase</pre>');
+
+			// Prepare Episode items for insert
 			$items = episode_import_prepare();
 			$items_count = count($items) - 1;
 			$i = 0;
-			//drupal_set_message('<pre>items_count - ' . $items_count . '</pre>');
 			// Create the Queue
 			$queue = DrupalQueue::get('protrack_import_episode');
 			foreach($items as $item) {
@@ -152,12 +136,12 @@ function protrack_import_automation_cron() {
 		//Airlist Connect queue//
 		/////////////////////////
 		if(!empty($import_list['airlist'])) {
-			//drupal_set_message('<pre>airlist connect phase</pre>');
+      
 			$items = airlist_import_prepare();
       $airlist_items = $items;
 			$items_count = count($items) - 1;
 			$i = 0;
-			//drupal_set_message('<pre>items_count - ' . $items_count . '</pre>');
+      
 			// Create the Queue
 			$queue = DrupalQueue::get('protrack_import_airlist_connect');
 			foreach($items as $item) {
@@ -172,6 +156,8 @@ function protrack_import_automation_cron() {
 		}
 
 /*
+    // Kept for reference
+
 		/////////////////////////
 		//Airdate Connect queue//
 		/////////////////////////
@@ -195,6 +181,7 @@ function protrack_import_automation_cron() {
 		  }
 		}
 */
+
 		/////////////////////////
 		//End Queue            //
 		/////////////////////////
@@ -204,13 +191,13 @@ function protrack_import_automation_cron() {
 			$queue->createItem('protrack_end_queue');
 		}
 	} else {
-	//drupal_set_message('list is empty. do nothing.');
+	// list is empty. do nothing.
 	}
 }
 
-
 /**
- * Worker Callback for the airlist import cron queue.
+ * Important to handle the Airlist insert and table correctly
+ * so there is no downtime of content display
  */
 function protrack_import_airlist($item) {
 	switch($item) {
@@ -254,10 +241,9 @@ function protrack_import_airlist($item) {
 }
 
 /**
- * Worker Callback for the series import cron queue.
+ * Handle the Series insert
  */
 function protrack_import_series($item) {
-
 	$i=0;
 	switch($item) {
 		// Series import phase
@@ -279,7 +265,6 @@ function protrack_import_series($item) {
 					))
 				->condition('run_id', $run_id, '=')
 				->execute();
-
 				watchdog('protrack_import_automation', 'Series import operation was successful.', array(), WATCHDOG_INFO);
 
 		break;
@@ -301,8 +286,9 @@ function protrack_import_series($item) {
 		break;
 	}
 }
+
 /**
- * Worker Callback for the episode import cron queue.
+ * Handle the Episode inserts
  */
 function protrack_import_episode($item) {
 	$i=0;
@@ -326,7 +312,6 @@ function protrack_import_episode($item) {
 					))
 				->condition('run_id', $run_id, '=')
 				->execute();
-
 				watchdog('protrack_import_automation', 'Episode connection operation was successful.', array(), WATCHDOG_INFO);
 
 		break;
@@ -340,8 +325,9 @@ function protrack_import_episode($item) {
 		break;
 	}
 }
+
 /**
- * Worker Callback for the airlist connect operation.
+ * Airlist connect handler
  */
 function protrack_import_airlist_connect($item) {
 	switch($item) {
@@ -361,7 +347,6 @@ function protrack_import_airlist_connect($item) {
 					))
 				->condition('run_id', $run_id, '=')
 				->execute();
-
 				watchdog('protrack_import_automation', 'Airlist connection operation was successful.', array(), WATCHDOG_INFO);
 
 		break;
@@ -378,64 +363,6 @@ function protrack_import_airlist_connect($item) {
 			// Airlist Connect phase
 			airlist_connect('series', $file_data_row, $file_data_row['5']);
 			airlist_connect('episode', $file_data_row, $file_data_row['5']);
-		break;
-	}
-}
-/**
- * Worker Callback for the airlist connect operation.
- */
-function protrack_import_airdates_connect($item) {
-  //drupal_set_message('protrack_import_airdates_connect');
-//drupal_set_message(print_r($item, TRUE));
-	switch($item) {
-		case 'airdates_connect_end':
-/*
-			// Flag that the connect phase is complete
-			$query = db_select('kued_automation', 's')
-				->fields('s', array('run_id'))
-				->orderBy('run_id', 'DESC')
-				->range(0,1)
-				->execute();
-			$run_id = db_query($query)->fetchField();
-		
-			// Flag that query completed
-			$run_id = db_update('kued_automation')
-				->fields(array(
-					'airdates_complete' => strtotime('now'),
-					))
-				->condition('run_id', $run_id, '=')
-				->execute();
-*/
-				watchdog('protrack_import_automation', 'Airdates update operation was successful.', array(), WATCHDOG_INFO);
-
-		break;
-		default:
-			// Assign some variables for the import	
-/*
-			$file_data_row = array();
-			$file_data_row['0'] = $item['fulldate']; // text
-			$file_data_row['1'] = $item['series_id']; // reference
-			$file_data_row['2'] = $item['program_id']; // reference
-			$file_data_row['3'] = $item['version_id']; // reference
-			$file_data_row['4'] = $item['rebroadcast']; //text
-			$file_data_row['5'] = $item['channel']; // taxonomy
-*/
-			// Airlist Connect phase
-			//airlist_connect('series', $file_data_row, $file_data_row['5']);
-			//airlist_connect('episode', $file_data_row, $file_data_row['5']);
-
-//drupal_set_message('include module');
-
-			module_load_include('inc', 'protrack_import', 'protrack_import.airdates.functions');
-			// Skip the first line
-
-				//airdates_connect($item);
-
-			if(is_array($item)) {
-        dpm('is_array');
-				airdates_connect($item);
-			}
-
 		break;
 	}
 }
@@ -471,20 +398,15 @@ function protrack_import_end_queue() {
 
 	// Process is complete!
 	watchdog('protrack_import_automation', 'ProTrack import process completed: %run_date_end', array('%run_date_end' => format_date($run_date_end, 'long')), WATCHDOG_INFO);
-
 }
 
 /**
  * Build Airlist Items array
  */
 function airlist_import_prepare() {
-  //drupal_set_message('airlist_import_prepare');
-	// Get the airlist file - this is going to take a while
-	//$file_name = "sites/default/files/protrack_import/airlist.txt";
+	// Get the Airlist file
 	$file_path = drupal_realpath('private://');
 	$file_name = file_create_url($file_path . '/airlist.txt');
-
-//drupal_set_message($file_name);
 
 	$current_time_human = format_date(strtotime('now'), 'long');
 	// Preprocess the datafile
@@ -521,8 +443,6 @@ function airlist_import_prepare() {
 			// If no file exists create a warning.
 			watchdog('protrack_import_automation', '%file_name was missing at import!', array('%file_name' => $file_name), WATCHDOG_ALERT);
 	}
-  //drupal_set_message('return items:');
-  //drupal_set_message(print_r($items, TRUE));
 	return $items;
 }
 
@@ -530,8 +450,7 @@ function airlist_import_prepare() {
  * Build Series Items array
  */
 function series_import_prepare() {
-	// Get the series file - this is going to take a while
-	//$file_name = "sites/default/files/protrack_import/series.txt";
+	// Get the Series file
 	$file_path = drupal_realpath('private://');
 	$file_name = file_create_url($file_path . '/series.txt');
 
@@ -573,8 +492,7 @@ function series_import_prepare() {
  * Build Episode Items array
  */
 function episode_import_prepare() {
-	// Get the episode file - this is going to take a while
-	//$file_name = "sites/default/files/protrack_import/episode.txt";
+	// Get the Episode file
 	$file_path = drupal_realpath('private://');
 	$file_name = file_create_url($file_path . '/episode.txt');
 
@@ -638,8 +556,7 @@ function episode_import_prepare() {
  * Build Airlist Items array
  */
 function airlist_connect_prepare() {
-	// Get the airlist file - this is going to take a while
-	//$file_name = "sites/default/files/protrack_import/airlist.txt";
+	// Get the Airlist file
 	$file_path = drupal_realpath('private://');
 	$file_name = file_create_url($file_path . '/airlist.txt');
 
@@ -681,21 +598,16 @@ function airlist_connect_prepare() {
 	return $items;
 }
 
-////////////////////////
-////////////////////////
-////////////////////////
-
+/**
+ * Remove a stuck queue
+ */
 function protrack_import_automation_fix($run_id){
 	watchdog('protrack_import_automation', 'ProTrack Import Queue has been RESET!', array(), WATCHDOG_ALERT);
 	// Remove the last automation record
 	$field_delete = db_delete('kued_automation')
 		->condition('run_id', $run_id)
 		->execute();
-
-	// todo: add Queue removal
-
 }
-
 
 /**
  * Protrack Automation Routine part one
@@ -710,32 +622,14 @@ function protrack_import_automation_import_check_one() {
 		->range(0,1)
 		->execute();
 	$run_status = db_query($query)->fetchAssoc();
-	//drupal_set_message('<pre>run_status: ' . print_r($run_status, TRUE) . '</pre>');
 
 	// Check for a stuck queue
 	if($run_status['run_active'] == 1){
 		watchdog('protrack_import_automation', 'ProTrack checked but the last Run is still active.', array(), WATCHDOG_INFO);
-		//if($run_status['run_date_start'] + 14400 <= strtotime('now') && $run_status['run_date_start'] + 28800 >= strtotime('now') ){
 		if($run_status['run_date_start'] + 10800 <= strtotime('now')){
-			//dpm('4 hour overtime fail');
 			watchdog('protrack_import_automation', 'ProTrack Import Queue has been active for 3 hours!', array(), WATCHDOG_ALERT);
 			protrack_import_automation_fix($run_status['run_id']);
 		}
-/*		 elseif($run_status['run_date_start'] + 28800 <= strtotime('now')){
-			//dpm('long overtime fail');
-			// Something is seriously stuck.  Delete all related Queues and the last import record.
-			protrack_import_automation_fix($run_status['run_id']);
-		}
-
-	// Check for incomplete phase
-	} elseif($run_status['airlist_complete'] == 0 || $run_status['series_complete'] == 0 || $run_status['episode_complete'] == 0 || $run_status['connect_complete'] == 0){
-			watchdog('protrack_import_automation', 'One phase of the ProTrack Import process did not complete!', array(), WATCHDOG_ALERT);
-
-	// Run the schedule
-	} elseif($run_status['run_active'] == 0 && $run_status['run_date_end'] > 0 && $run_status['airlist_complete'] > 0 && $run_status['series_complete'] > 0 && $run_status['episode_complete'] > 0 && $run_status['connect_complete'] > 0) {
-		drupal_set_message('last run completed, proceed');
-*/
-
 	} else {
 		// Check for incomplete phase
 		if($run_status['airlist_complete'] == 0 || $run_status['series_complete'] == 0 || $run_status['episode_complete'] == 0 || $run_status['connect_complete'] == 0){
@@ -743,12 +637,6 @@ function protrack_import_automation_import_check_one() {
 				//protrack_import_automation_fix($run_status['run_id']);
 		}
 		watchdog('protrack_import_automation', 'The last ProTrack automation was completed.', array());
-		// Run the schedule
-		/*
-		if($run_status['run_active'] == 0 && $run_status['run_date_end'] != 0 && $run_status['airlist_complete'] != 0 && $run_status['series_complete'] != 0 && $run_status['episode_complete'] != 0 && $run_status['connect_complete'] != 0) {
-			//drupal_set_message('last run completed, proceed');
-		}
-		*/
 
 		// Now run the schedule check
 		$import_list = protrack_import_automation_import_check_two($run_status);	
@@ -762,22 +650,15 @@ function protrack_import_automation_import_check_one() {
 	return $import_list;
 }
 
-
 /**
  * Protrack Automation Routine - Part 2
  */
 function protrack_import_automation_import_check_two($run_status) {
 	watchdog('protrack_import_automation', 'ProTrack began Schedule check.', array());
 	// Schedule of when the file copy is started
-	//$daily_file_schedule_array = array('12:00 AM', '10:00 AM', '6:00 PM');
+	// $daily_file_schedule_array = array('12:00 AM', '10:00 AM', '6:00 PM');
+  
 	// Schedule of when the cron is supposed to start
-/*
-	$daily_cron_schedule_array = array(
-		0 => array('Today 12:00 AM', 'Today 10:00:00 AM', 'Overnight'),
-		1 => array('Today 2:00 PM','Today 2:10:00 PM', 'Morning'),
-		2 => array('Today 3:00 PM','Today 11:59:59 PM', 'Evening'),
-		);
-	*/
 	$daily_cron_schedule_array = array(
 		0 => array('Today 12:25 AM', 'Today 9:50 AM', 'Overnight'),
 		1 => array('Today 10:25 AM','Today 5:50 PM', 'Morning'),
@@ -794,14 +675,6 @@ function protrack_import_automation_import_check_two($run_status) {
 	// This is the variable that we'll send back to show what files are clear to import
 	$import_list = array();
 
-	//$current_time_unix = strtotime('today 2:30 am');
-	//$current_time_human = format_date(strtotime('today 9:30 am'), 'long');
-/*
-	drupal_set_message('<pre>file_name_array: '.print_r($file_name_array, TRUE).'</pre>');	
-	drupal_set_message('<pre>current_time_human: '.print_r($current_time_human, TRUE).'</pre>');
-	drupal_set_message('<pre>daily_cron_schedule_array: '.print_r($daily_cron_schedule_array, TRUE).'</pre>');
-*/
-
 	foreach($daily_cron_schedule_array as $daily_cron_block_array) {
 		$cron_run_start_unix = strtotime($daily_cron_block_array[0]);
 		$cron_run_stop_unix = strtotime($daily_cron_block_array[1]);
@@ -809,103 +682,122 @@ function protrack_import_automation_import_check_two($run_status) {
 		$cron_run_start_human = format_date($cron_run_start_unix, 'long');
 		$cron_run_stop_human = format_date($cron_run_stop_unix, 'long');
 
-/*
-	drupal_set_message('<pre>Step 1 - prepare</pre>');
-	drupal_set_message('<pre>cron_run_start_unix: ' . $cron_run_start_unix . '<br />cron_run_stop_unix: ' . $cron_run_stop_unix . '</pre>');
-	drupal_set_message('<pre>cron_run_start_human: ' . $cron_run_start_human . '<br />cron_run_stop_human: ' . $cron_run_stop_human . '</pre>');
-	drupal_set_message('<pre>daily_cron_block_array: '.print_r($daily_cron_block_array, TRUE).'</pre>');
-*/
-			if($current_time_unix > $cron_run_start_unix && $current_time_unix < $cron_run_stop_unix) { // Original
-				//drupal_set_message('<pre>Step 2 - insert into correct time block</pre>');
-				watchdog('protrack_import_automation', '%cron_run_title: Schedule is clear, go head with ProTrack import.', array('%cron_run_title' => $cron_run_title));
+    if($current_time_unix > $cron_run_start_unix && $current_time_unix < $cron_run_stop_unix) {
+      // Step 2 - insert into correct time block;
+      watchdog('protrack_import_automation', '%cron_run_title: Schedule is clear, go head with ProTrack import.', array('%cron_run_title' => $cron_run_title));
 
-				$start_run_unix = $run_status['run_date_start'];
-				$start_run_human = format_date($run_status['run_date_start'], 'long');
-				$last_run_unix = $run_status['run_date_end'];
-				$last_run_human = format_date($run_status['run_date_end'], 'long');
-				$active = $run_status['run_active'];
+      $start_run_unix = $run_status['run_date_start'];
+      $start_run_human = format_date($run_status['run_date_start'], 'long');
+      $last_run_unix = $run_status['run_date_end'];
+      $last_run_human = format_date($run_status['run_date_end'], 'long');
+      $active = $run_status['run_active'];
 
-				//drupal_set_message('<pre>Active Run: ' . print_r($run_status, TRUE) . '</pre>');	
-				//drupal_set_message('<pre>Start Run Time: ' . $start_run_human . ', Timestamp: ' . $start_run_unix . '</pre>');	
-				//drupal_set_message('<pre>Last Run Time: ' . $last_run_human . ', Timestamp: ' . $last_run_unix . '</pre>');	
+      // Go through each filetype
+      foreach($file_name_array as $file) {
+        $file_name = file_create_url($file_path . '/' . $file . '.txt');
+          // Check to see if the file exists.
+          if (file_exists($file_name)) {
+            // Find out when the file on the server was last modified
+            $file_mod_time_unix = filemtime($file_name);
+            $file_mod_time_human = format_date(filemtime($file_name), 'long');
 
-					// Go through each filetype
-					foreach($file_name_array as $file) {
-						//$file_path = drupal_realpath('private://');
-						$file_name = file_create_url($file_path . '/' . $file . '.txt');
-							// Check to see if the file exists.
-							if (file_exists($file_name)) {
-								// Find out when the file on the server was last modified
-								$file_mod_time_unix = filemtime($file_name);
-								$file_mod_time_human = format_date(filemtime($file_name), 'long');
-								//drupal_set_message('<pre>Current Time: ' . $current_time_human . ', Current Timestamp: ' . $current_time_unix . '<br /></pre>');
-								//drupal_set_message('<pre>Last Run Time: ' . $last_run_human . ', Timestamp: ' . $last_run_unix . '</pre>');
-								//drupal_set_message('<pre>'.$file . ' was last modified: ' . $file_mod_time_human . ', Timestamp: ' . $file_mod_time_unix . '</pre>');
-
-								// File was created after the last run was recorded
-								if($file_mod_time_unix > $start_run_unix){
-									watchdog('protrack_import_automation', '%cron_run_title: %file file is new, add to Import List', array('%cron_run_title' => $cron_run_title, '%file' => $file));
-									//drupal_set_message('<pre>Step 3 - file is newer than the last queue completion</pre>');
-
-									// Build the file list of files to import
-									switch($file) {
-										case 'airlist';
-											//drupal_set_message('<pre>Airlist Insert!</pre>');
-											$import_list['airlist'] = 1;
-										break;
-										case 'series':
-											//drupal_set_message('<pre>Series Insert!</pre>');
-											$import_list['series'] = 1;
-										break;
-										case 'episode';
-											//drupal_set_message('<pre>Episode Insert!</pre>');
-											$import_list['episode'] = 1;
-										break;
-									}
-									// Flag the end of the queue
-									$import_list['end'] = 1;
-								} else {
-									$file_status = format_date($file_mod_time_unix);
-									watchdog('protrack_import_automation', '%cron_run_title: %file is old. File: %file_status | Last: %start_run_human', array('%start_run_human' => $start_run_human, '%file_status' => $file_status, '%file' => $file, '%cron_run_title' => $cron_run_title));
-								}
-							} else {
-							// If the file is missing let me know!
-							$file_mod_time_human = format_date(filemtime($file_name), 'long');
-							watchdog('protrack_import_automation', '%file_name was missing at import! time: ', array('%file_name' => $file_name), WATCHDOG_ALERT);
-						}
-					}
-				} else {
-					watchdog('protrack_import_automation', '%cron_run_title: No ProTrack query was made: "safe period".', array('%cron_run_title' => $cron_run_title));
-				}
-			}
-/*
-	// The files we're going to be accessing
-	$files = array('airlist', 'series', 'episode');
-
-	// Cycle through each.
-	foreach($files as $file) {
-	$path = drupal_realpath('private://');
-	$private_file = file_create_url($path . '/' . $file . '.txt');
-	if(!file_exists($private_file)){
-		$valid = 0;
-		} else {
-		$valid = 1;	
-		}
-	//$valid = file_validate(&$file);
-	drupal_set_message('<pre>private_file: '. $private_file . '</pre>');
-	}
-
-	foreach($daily_cron_schedule_array as $cron_run){
-		$cron_run_unix = strtotime($cron_run);
-		$cron_run_human = format_date($cron_run_unix, 'long');
-		drupal_set_message('<pre>cron_run: ' . $cron_run . '</pre>');
-	}
-*/
-
+            // File was created after the last run was recorded
+            if($file_mod_time_unix > $start_run_unix){
+              watchdog('protrack_import_automation', '%cron_run_title: %file file is new, add to Import List', array('%cron_run_title' => $cron_run_title, '%file' => $file));
+              // Step 3 - file is newer than the last queue completion
+              // Build the file list of files to import
+              switch($file) {
+                case 'airlist';
+                  $import_list['airlist'] = 1;
+                break;
+                case 'series':
+                  $import_list['series'] = 1;
+                break;
+                case 'episode';
+                  $import_list['episode'] = 1;
+                break;
+              }
+              // Flag the end of the queue
+              $import_list['end'] = 1;
+            } else {
+              $file_status = format_date($file_mod_time_unix);
+              watchdog('protrack_import_automation', '%cron_run_title: %file is old. File: %file_status | Last: %start_run_human', array('%start_run_human' => $start_run_human, '%file_status' => $file_status, '%file' => $file, '%cron_run_title' => $cron_run_title));
+            }
+          } else {
+          // If the file is missing let me know!
+          $file_mod_time_human = format_date(filemtime($file_name), 'long');
+          watchdog('protrack_import_automation', '%file_name was missing at import! time: ', array('%file_name' => $file_name), WATCHDOG_ALERT);
+        }
+      }
+    } else {
+      watchdog('protrack_import_automation', '%cron_run_title: No ProTrack query was made: "safe period".', array('%cron_run_title' => $cron_run_title));
+    }
+  }
 	if(!empty($import_list)){
 		//drupal_set_message('<pre>import_list: ' . print_r($import_list, TRUE) . '</pre>');
 		watchdog('protrack_import_automation', 'Import List has been created.', array());
 	}
-
 	return $import_list;
 }
+
+/**
+ * Worker Callback for the airlist connect operation.
+ * Kept for reference
+ */
+/*
+function protrack_import_airdates_connect($item) {
+  //drupal_set_message('protrack_import_airdates_connect');
+  //drupal_set_message(print_r($item, TRUE));
+	switch($item) {
+		case 'airdates_connect_end':
+
+			// Flag that the connect phase is complete
+			$query = db_select('kued_automation', 's')
+				->fields('s', array('run_id'))
+				->orderBy('run_id', 'DESC')
+				->range(0,1)
+				->execute();
+			$run_id = db_query($query)->fetchField();
+		
+			// Flag that query completed
+			$run_id = db_update('kued_automation')
+				->fields(array(
+					'airdates_complete' => strtotime('now'),
+					))
+				->condition('run_id', $run_id, '=')
+				->execute();
+
+				watchdog('protrack_import_automation', 'Airdates update operation was successful.', array(), WATCHDOG_INFO);
+
+		break;
+		default:
+			// Assign some variables for the import	
+
+			$file_data_row = array();
+			$file_data_row['0'] = $item['fulldate']; // text
+			$file_data_row['1'] = $item['series_id']; // reference
+			$file_data_row['2'] = $item['program_id']; // reference
+			$file_data_row['3'] = $item['version_id']; // reference
+			$file_data_row['4'] = $item['rebroadcast']; //text
+			$file_data_row['5'] = $item['channel']; // taxonomy
+
+			// Airlist Connect phase
+			//airlist_connect('series', $file_data_row, $file_data_row['5']);
+			//airlist_connect('episode', $file_data_row, $file_data_row['5']);
+
+      //drupal_set_message('include module');
+
+			module_load_include('inc', 'protrack_import', 'protrack_import.airdates.functions');
+			// Skip the first line
+
+				//airdates_connect($item);
+
+			if(is_array($item)) {
+        dpm('is_array');
+				airdates_connect($item);
+			}
+
+		break;
+	}
+}
+*/

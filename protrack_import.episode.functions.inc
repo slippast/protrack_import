@@ -1,78 +1,72 @@
 <?php
+
+/**
+* Prepare for the Episode for import
+*/
 function episode_protrack_prepare($file_data_row) {
 	require_once(dirname(__FILE__) . '/protrack_import.functions.inc');
-	//Do I need this?
-	$uid ='';
+	$uid =''; // Not using the uid.
 
-	//Assign some variables for the import	
+	// Assign some variables for the import	
 	$episode_series_id = t('@episode_series_id', array('@episode_series_id' => $file_data_row[0]));
 	$episode_program_id = t('@episode_program_id', array('@episode_program_id' => $file_data_row[1]));
 	$episode_version_id = t('@episode_version_id', array('@episode_version_id' => $file_data_row[2]));
 
-  //drupal_set_message(t('episode_series_id: @episode_series_id', array('@episode_series_id' => $episode_series_id)));
-
-	//NOTE if the Series doesn't exist DON'T create the Episode Node
-	//Insert Node Reference
+	// NOTE: if the Series doesn't exist DON'T create the Episode Node
+	// First Insert Node Reference
 	$query = db_select('field_data_field_series_id', 'f')
 		->fields ('f', array ('entity_id'))
 		->condition('field_series_id_value', $episode_series_id);
 	$node_ref = $query->execute()->fetchField();
 	//drupal_set_message(t('node_ref: @node_ref', array('@node_ref' => $node_ref)));
 
-	//Connect the Episode to the Series
+	//C onnect the Episode to the Series
 	if($node_ref) {
-		//Fix the title
+		// Fix the title
 		$episode_title = t('@episode_title', array('@episode_title' => protrack_import_fix_text($file_data_row[5])));
 		$episode_title = reverse_html($episode_title);
 	  $episode_title = title_replacement_filter($episode_title);
 		$video_title = $episode_title;
-	  //drupal_set_message(t('episode_title: @episode_title', array('@episode_title' => $episode_title)));
 
-		//The episode_title replacement will become: series_title - episode_number
+		// The episode_title replacement will become: series_title - episode_number
 		if(!$episode_title) {
-			//Get the series title as a placeholder
+			// Get the series title as a placeholder
 			$query = db_select('node', 'n')
 				->fields ('n', array ('title'))
 				->condition('nid', $node_ref);
 			$series_title = $query->execute()->fetchField();
-      //drupal_set_message(t('series_title 1: @series_title', array('@series_title' => $series_title)));
-
-			//Fix the title
+			// Fix the title
 			$series_title = protrack_import_fix_title(reverse_html(t($series_title)));
 			$video_title = $series_title;
-			//$series_title = protrack_import_fix_title($series_title);
-      //drupal_set_message(t('series_title 2: @series_title', array('@series_title' => $series_title)));
 
 			// Add the episode_number if the episode_title doesn't exist,
       // if the episode_number is 0 then make it the
       // episode_program_id...need a unique id please...stupid protrack.
 			$episode_number = $file_data_row[4];
-				if($episode_number == '0') {
-					$episode_number = $episode_program_id;
-					}
-			//Build the new title
+      if($episode_number == '0') {
+        $episode_number = $episode_program_id;
+      }
+			// Build the new title
+      // Discontinued methods kept for reference
 			//$episode_title = t('@series_title - @episode_number', array('@series_title' => $series_title, '@episode_number' => $episode_number));
-			$episode_title = $series_title . " - episode: " . $episode_number;
 			//$episode_title = t('@series_title @episode_program_id', array('@series_title' => $series_title, '@episode_program_id' => $episode_program_id));
 			//$episode_title = t('@series_title', array('@series_title' => $series_title));
+			$episode_title = $series_title . " - episode: " . $episode_number;
 
 			//Fix the title
 			$episode_title = reverse_html($episode_title);
-			//$episode_title = protrack_import_fix_title($episode_title);
 
 			} else {
-      //drupal_set_message(t('no series title'));
-			$series_title = '';
-      //drupal_set_message(t('Episode Title Missing! Do something quick!<br />node_ref: @node_ref<br />epsiode_title: @episode_title<br />', array('@node_ref' => $node_ref, '@episode_title' => $episode_title)));
+        // A few notes...
+        // This should never happen. If it does the series was most likely not created, meaning the Episodes will not be created.
+        // However, I believe that the series title field is non-null in the Protrack system.
+        // If it does happen let's send an empty variable so the episodes will exist even if the series doesn't.
+        $series_title = '';
 			}
-
-      //drupal_set_message('four');
-      //drupal_set_message(t('<hr />'));
 		
 			//Fix the guide
 			if(strlen($file_data_row[6])) {
 				$episode_guide = reverse_html(t('@episode_guide', array('@episode_guide' => $file_data_row[6])));
-				//$episode_guide = reverse_html($episode_guide);
 			} else {
 				$episode_guide = '';
 			}
@@ -80,21 +74,21 @@ function episode_protrack_prepare($file_data_row) {
 			//Fix the description
 			if(strlen($file_data_row[7])) {
 				$episode_description = reverse_html(t('@episode_description', array('@episode_description' => $file_data_row[7])));
-				//$episode_description = reverse_html($episode_description);
 			} else {
 				$episode_description = '';
 			}
 		
-			//If there is no guide use the episode_description
+			// If there is no guide use the episode_description
+      // If he guide length is too long we'll let Drupal's field formatter handle it.
+      // It'll do a better job and not lock us into truncated text.
 			if(empty($episode_guide)) {
-				//$episode_guide = truncate_utf8($episode_description, 40, $wordsafe = TRUE, $add_ellipsis = TRUE, $min_wordsafe_length = 30);
 				$episode_guide = $episode_description;
 			}
 			//If there is no description use the episode_guide
 			if(empty($episode_description)) {
 				$episode_description = $episode_guide;
 			}
-		
+
 			$episode_language_formatted = LANGUAGE_NONE;
 
 			$episode_url = trim($file_data_row[8]);
@@ -116,7 +110,6 @@ function episode_protrack_prepare($file_data_row) {
 			$episode_letterbox_formatted = episode_import_letterbox_fix($episode_letterbox); // Taxonomy
 			$episode_version_id = trim($file_data_row[2]);
 			$episode_source = $file_data_row[16]; //String
-      //dsm($episode_program_id);
 
       // Here's the better way to package this data
       $new_episode = array();
@@ -139,25 +132,32 @@ function episode_protrack_prepare($file_data_row) {
 			$new_episode['keywords'] = t(protrack_import_fix_text($file_data_row[25])); //Taxonomy
 			$new_episode['series_reference'] = $node_ref;
 
-		//Check to see if the program_id exists - if it does jump to the version id
-		$query = db_select('field_data_field_program_id', 'f')
-			->condition('field_program_id_value', $new_episode['program_id'], '=')
-			->fields ('f', array ('field_program_id_value'));
-		$program_check = $query->execute()->fetchField();
-	  //drupal_set_message(t('program_check: @program_check', array('@program_check' => $program_check)));
-
-		if(!strlen($program_check)) { $program_check_switch = 1; } else { $program_check_switch = 2; }
-      switch ($program_check_switch) {
-        case 1:
-        //drupal_set_message('<pre>This program_id does not exist, so build it.</pre>');
-        //Create a new Episode
-        episode_page_create($episode_series_id, $episode_program_id, $episode_version_id, $episode_title, $episode_guide, $episode_description, $episode_language_formatted, $episode_url, $episode_length, $episode_keywords, $episode_rating, $episode_caption, $episode_dvs, $episode_stereo_formatted, $episode_hdtv, $episode_letterbox_formatted, $node_ref, $uid, $series_title, $episode_source);
-        //Add versions
-        //episode_version_add($episode_program_id, $episode_version_id, $episode_title, $episode_guide, $episode_description, $episode_length, $episode_number, $episode_url, $episode_rating, $episode_caption, $episode_dvs, $episode_stereo_formatted, $episode_hdtv, $episode_letterbox_formatted, $episode_language_formatted, $node_ref, $uid, $series_title, $video_title);
+      //Check to see if the program_id exists - if it does jump to the version id
+      $query = db_select('field_data_field_program_id', 'f')
+        ->condition('field_program_id_value', $new_episode['program_id'], '=')
+        ->fields ('f', array ('field_program_id_value'));
+      $program_check = $query->execute()->fetchField();
   
-        // Create Version
-        //episode_version_create($episode_program_id, $episode_version_id, $episode_title, $episode_length, $episode_number, $episode_rating, $episode_caption, $episode_dvs, $episode_stereo_formatted, $episode_hdtv, $episode_letterbox_formatted, $episode_language_formatted, $node_ref, $uid, $series_title);
+      if(!strlen($program_check)) {
+          $program_check_switch = 1;
+        } else {
+          $program_check_switch = 2;
+        }
+        
+        // Decide how to proceed
+        switch ($program_check_switch) {
+          case 1:
+          //Create a new Episode
+          episode_page_create($episode_series_id, $episode_program_id, $episode_version_id, $episode_title, $episode_guide, $episode_description, $episode_language_formatted, $episode_url, $episode_length, $episode_keywords, $episode_rating, $episode_caption, $episode_dvs, $episode_stereo_formatted, $episode_hdtv, $episode_letterbox_formatted, $node_ref, $uid, $series_title, $episode_source);
+          
+          // We're not using versioning of episodes.
+          // Kept for reference.
+          //Add versions
+          //episode_version_add($episode_program_id, $episode_version_id, $episode_title, $episode_guide, $episode_description, $episode_length, $episode_number, $episode_url, $episode_rating, $episode_caption, $episode_dvs, $episode_stereo_formatted, $episode_hdtv, $episode_letterbox_formatted, $episode_language_formatted, $node_ref, $uid, $series_title, $video_title);
     
+          // Create Version
+          //episode_version_create($episode_program_id, $episode_version_id, $episode_title, $episode_length, $episode_number, $episode_rating, $episode_caption, $episode_dvs, $episode_stereo_formatted, $episode_hdtv, $episode_letterbox_formatted, $episode_language_formatted, $node_ref, $uid, $series_title);
+      
         break;
         case 2:
         // Let's write a bit to evaluate whether we need to update the episode at all.
@@ -172,36 +172,26 @@ function episode_protrack_prepare($file_data_row) {
  			break;
 		}
 	}
-//dpm(debug_print_backtrace());
 }
 
 
-
-//Function for creating the main Episode page
+/**
+* Create the Episode page
+*/
 function episode_page_create($episode_series_id, $episode_program_id, $episode_version_id, $episode_title, $episode_guide, $episode_description, $episode_language_formatted, $episode_url, $episode_length, $episode_keywords, $episode_rating, $episode_caption, $episode_dvs, $episode_stereo_formatted, $episode_hdtv, $episode_letterbox_formatted, $node_ref, $uid, $series_title, $episode_source) {
 
-  /*
-  //NOTE if the Series doesn't exist DON'T create the Episode Node
-  //Insert Node Reference
-  $node_ref = db_query("SELECT entity_id FROM {field_data_field_series_id} WHERE field_series_id_value = :series_id", array(':series_id' => $episode_series_id))->fetchField();
-  //Connect the Episode to the Series
-  if(strlen($node_ref)) {
-  */
-
-	//Begin the node import process
-	$node = new stdClass(); // Create a new node object
-	$node->type = "episode"; // Or series, or whatever content type you like
-	node_object_prepare($node); // Set some default values
+	// Begin the node import process
+	$node = new stdClass(); // Instantiate a new node object
+	$node->type = "episode";
+	node_object_prepare($node); // Time to set some default values
 
 	//uid associated with this node
-	$node->uid = 1; // UID of the author of the node; or use $node->name
+	$node->uid = 1; // UID of the author of the node; or use $node->name KUED Admin
+  
 	//Set the title
 	$node->title = $episode_title;
-	//$node->language = $episode_language_formatted;
 	$node->language = $episode_language_formatted;
 
-
-  //$node_ref = '90186';
 	//Now insert the entity reference
 	if($node_ref) {
     // Insert Episode Source
@@ -313,7 +303,6 @@ function episode_page_create($episode_series_id, $episode_program_id, $episode_v
 					$taxonomy->vid = $episode_keywords_vid;
 					$taxonomy->format = 'full_html';
 				taxonomy_term_save($taxonomy);
-				//$t++;
 			}
 
 		//All new terms are added, now get the tid and associate it with the new node
@@ -326,10 +315,7 @@ function episode_page_create($episode_series_id, $episode_program_id, $episode_v
 		//Build an array of the tid's to import as a group
 		$episode_keywords_insert[] = $tid;
 		}
-
-		//drupal_set_message(t('<strong>keyword</strong>: @v', array('@v' => $episode_keyword_row_formatted)));
-		//drupal_set_message(t('<strong>tid</strong>: @v', array('@v' => $tid)));
-
+    
     //Now add the keywords incrementally to the node object
     foreach($episode_keywords_insert as $tid) {
 		  $node->field_episode_keywords[$node->language][]['tid'] = $tid;
@@ -337,7 +323,6 @@ function episode_page_create($episode_series_id, $episode_program_id, $episode_v
 	//END Keywords Loop - we have built an array of terms and added them to this node
 	}
 
-  //dpm($node);
 	//Save the new node!
 	if($node = node_submit($node)) {
 		node_save($node);
@@ -345,25 +330,24 @@ function episode_page_create($episode_series_id, $episode_program_id, $episode_v
 	}
 	return $nid;
 
-	//END Reference check
-	//}
 //END Episode Create
 }
 
-////////////////////////////////////////////////////
-// Check the Series and if it's KUED then fix it up
+/**
+* Check the Series and if it's KUED then manage the output
+*/
 function kued_series_handler($node, $series_reference, $episode_source, $series_code) {
   // Here we need to first check the to see if the series is on the KUED Productions List.
   // If it is then we should ignore the associtations.
   $node->field_kued_production[$node->language][0]['value'] = 1;
   
   // We need to check the series code. If it's a groups series like Hinkely Report they should remain connection,
-  // otherwise connected them to KUED Local Productions.  Exclusion list:
-  // Utah Conversations, Governor's Monthly News Conference, The Hinckley Report, This is Utah
+  // otherwise connected them to KUED Local Productions.
+  // Exclusion list:
+  // Utah Conversations, Governor's Monthly News Conference, The Hinckley Report, This is Utah, Contact
   $series_node = node_load($series_reference);
-  //$series_code = $series_node->field_series_code[$series_node->language][0]['value'];
-
-  if($series_code == 'HNKREP' || $series_code == 'UCON' || $series_code == 'GVSNWS' || $series_code == '!EDTIU' || $series_code == '!EDGOV' || $series_code == '!EDHNK' || $series_code == '!EDTED') {
+  // Execute the exclusion
+  if($series_code == 'HNKREP' || $series_code == 'UCON' || $series_code == 'GVSNWS' || $series_code == '!EDTIU' || $series_code == '!EDGOV' || $series_code == '!EDHNK' || $series_code == '!EDTED' || $series_code == '!EDCON') {
     $node->field_series_link[$node->language][0]['target_id'] = $series_reference;
     $node->field_kued_production[$node->language][0]['value'] = 0;
   } else {
@@ -378,53 +362,11 @@ function kued_series_handler($node, $series_reference, $episode_source, $series_
   return $node;
 }
 
-////////////////////////////////////////////////////
-// Rather than repeating this Guide/Description handing over and over let's just drop it here.
-/*
-function kued_description_handler($node, $new_guide, $old_guide, $new_description, $old_description) {
-  // First check to see if the Guide is empty
-  if(!strlen($old_guide) && strlen($new_guide)) {   
-      $node->field_episode_guide[$node->language][0]['value'] = $new_guide;
-      $node->field_episode_guide[$node->language][0]['format'] = 'full_html';
-  // Second check to see if they're different. If they're not identical update
-  } elseif(strlen($old_guide) && strlen($new_guide)) {
-    if($old_guide == strip_tags($old_guide)) {
-      if($old_guide !=$new_guide) {
-        $node->field_episode_guide[$node->language][0]['value'] = $new_guide;
-        $node->field_episode_guide[$node->language][0]['format'] = 'full_html';
-      }
-    }
-  }
-  // First check to see if the Description is empty
-  if(empty($old_description) && strlen($new_description)) {
-    dpm('check 1');
-			$node->field_episode_description[$node->language][0]['value'] = $new_description;
-			$node->field_episode_description[$node->language][0]['format'] = 'full_html';
-			$node->field_episode_description[$node->language][0]['summary'] = text_summary($node->field_episode_guide[$node->language][0]['value']);
-  // Second check to see if they're different. If they're not identical update
-  } elseif(strlen($old_description) && strlen($new_description)) {
-    dpm('check 2');
-    if($old_description == strip_tags($old_description)) {
-      dpm('check 3');
-      if($old_description != $new_description) {
-        dpm('check 4');
-        $node->field_episode_description[$node->language][0]['value'] = $new_description;
-        $node->field_episode_description[$node->language][0]['format'] = 'full_html';
-        $node->field_episode_description[$node->language][0]['summary'] = text_summary($node->field_episode_guide[$node->language][0]['value']);
-      }
-    }
-  }  
-  return $node;
-}
-*/
-
-//////////////////////
-//////////////////////
-//////////////////////
-////////////////////////////////////////////////////
-// Function to check a few bits on the episode page
-// We need to know if anything has changed which will require an update.
-// If nothing has changed then let's just move on and not waste our time.
+/**
+ * Function to check a few bits on the episode page
+ * We need to know if anything has changed which will require an update.
+ * If nothing has changed then let's just move on and not waste our time.
+ */
 function episode_page_update_check($new_episode) {
   $debug = ''; // 1 for regular debug - 2 extra info - 3 overrides all imported variables - 'all' for everything
   if(!empty($debug)) {
@@ -441,20 +383,18 @@ function episode_page_update_check($new_episode) {
   $entity = $result['node'];
 
   // Now we need the fields - here's an easy way to get a list
+  // For obvious reasions this slows us WAY down in practice, let's just hard-code the fields
   //$fields = field_info_instances('node', 'episode');
-  //dpm($fields);
 
   // Manually enter the list of fields we're checking.
   // No need to search for the field id,
   // we already know it - save time.
   $fields = array(11 => 'field_version_id', 12 => 'field_episode_length', 14 => 'field_episode_guide', 15 => 'field_episode_description', 37 => 'field_episode_url', 115 => 'field_series_link', 23 => 'field_episode_hdtv', 18 => 'field_episode_rating', 25 => 'field_episode_letterbox', 24 => 'field_episode_caption', 21 => 'field_episode_stereo', 13 => 'field_episode_number', 27 => 'field_episode_keywords', 395 => 'field_episode_source');
-
   foreach ($fields AS $field_id => $field_name) {
     // Attach a field of selected id only to get value for it
     field_attach_load('node', $entity, FIELD_LOAD_CURRENT, array('field_id' => $field_id));
     $output[$field_name] = field_get_items('node', reset($entity), $field_name);
   }
-  //dpm($output);
 
   $old_episode = array();
   $old_episode['version_id'] = $output['field_version_id'][0]['value'];
@@ -570,13 +510,7 @@ function episode_page_update_check($new_episode) {
     $update['check'] = 1;
     $update['source'] = $new_episode['source'];
   }
-  /*
-  // I'm not sure I need to change this....
-  if($old_episode['series_reference'] != $new_episode['series_reference']) { // String
-    $update['check'] = 1;
-    $update['series_reference'] = $new_episode['series_reference'];
-  }
-  */
+
   // Evaluate the Boolean fields
   // HDTV
   if($old_episode['hdtv'] == 0) {
@@ -714,16 +648,10 @@ function episode_page_update_check($new_episode) {
 return $update;
 }
 
-
-//////////////////////
-//////////////////////
-//////////////////////
-//////////////////////
-//////////////////////
-//Function for updating the Episode nodes
+/**
+ * Function for updating the Episode nodes
+ */
 function episode_page_update($episode, $update) {
-  //dpm($episode);
-  //dpm($update);
   // 1 Open old episode.
   // 2 Check for differing/better data and update
   // 3 Add version_id
@@ -769,7 +697,6 @@ function episode_page_update($episode, $update) {
   if($source == 'KUED') {
     // Load the node to be updated
     $node = node_load($nid);
-    //dpm($node);
 
     // I need some original series info
     // Get the original series ID (if it's been changed)
@@ -894,7 +821,6 @@ function episode_page_update($episode, $update) {
   // End lock check
   }
 
-
   // We need to see if the version is already attached.
   // If it is then we need to not add a new version
   $query = db_select('field_data_field_version_id', 'f')
@@ -917,7 +843,6 @@ function episode_page_update($episode, $update) {
   // One last check to see if we've made it this far and the
   // node object hasn't been loaded.
   if(!empty($node)) {
-    //dpm($node);
     // Save and close the node
     if($node = node_submit($node)) { // Prepare node for saving
         node_save($node);
@@ -926,186 +851,3 @@ function episode_page_update($episode, $update) {
   return $nid;
   }
 }
-
-
-
-//////////////////////
-//////////////////////
-//////////////////////
-//////////////////////
-//////////////////////
-// THIS IS A DUMPING GROUND FOR OLD UDPATE CODE
-// BEWARE!!!
-/*
-//function episode_page_update($episode_program_id, $episode_version_id, $episode_title, $new_guide, $new_description, $episode_length, $episode_number, $episode_url, $episode_rating, $episode_caption, $episode_dvs, $episode_stereo_formatted, $episode_hdtv, $episode_letterbox_formatted, $episode_language_formatted, $node_ref, $uid, $series_title, $video_title, $episode_source) {
-
-function episode_update($episode_version_id, $episode_title, $episode_guide, $episode_description, $episode_length, $episode_number, $episode_url, $video_title, $node) {
-  //dpm('update');
-	// Lock Title?
-
-	//Update Episode Title
-	if(strlen($episode_title) || !empty($node->title)) {
-		// Check for differences in the code.  If they're not identical update
-		if(strcmp($node->title, $episode_title) != 0) {
-			// Ensure that we're not writing empty data
-			if(!empty($episode_title)){
-				$node->title = $episode_title;
-			}
-		}
-	}
-
-  /*
-    ////////////////////
-    ////////////////////
-    // Search for COVE videos HERE!
-    // NOTE this is useless with the advent of Passport so fuck it.
-    if(module_exists('protrack_import_cove')) {
-      $video = variable_get('protrack_import_cove');
-      if($video == 1) {
-        //drupal_set_message('video check');
-        //drupal_set_message('<pre>node_ref: '. $node_ref. '</pre>');
-        //drupal_set_message('<pre>series_title: '. $series_title. '</pre>');
-        $vid = video_protrack_run($video_title, $episode_title, $nid, $series_title, $node_ref); // Return an array of videos that were created
-        //drupal_set_message('<pre>vid - send to episode: '. print_r($vid, TRUE) . '</pre><hr />');
-        //drupal_set_message('<pre>vid: '.print_r($vid, TRUE).'</pre>');
-      }
-    } else {
-      //drupal_set_message(t('Module Missing<br />'));	
-    }
-    ////////////////////
-    ////////////////////
-  */
-
-
-
-  /*
-  // This is the OLD ROUTINE
-  // Check to see if the node is locked.  If it is then skip everything.
-  if($lock == 1000) {
-  
-    // We're going to evaluate the new and old guide and description.
-    // There's not much we can do to keep the content fresh, so a simple
-    // comparison is our best shot.
-    //$old_guide = trim(strip_tags($node->field_episode_guide[$node->language][0]['value']));
-    //$old_description = trim(strip_tags($node->field_episode_description[$node->language][0]['value']));
-    $old_guide = $node->field_episode_guide[$node->language][0]['value'];
-    $old_description = $node->field_episode_description[$node->language][0]['value'];
-
-
-    // Here we do some testing to ensure KUED content is handled correctly
-    // Also, check to see if the guide and description are empty.
-    // If there is we want to drop the new info into database, this is an update.
-    // We do this because it's common for the the inital data dump to be empty when
-    // it comes to the guide and description fields.
-    if($kued == 1 || $episode_source == 'HNKREP' || $episode_source == 'UCON') {
-      //dpm('kued flag');
-      $node = kued_series_handler($node, $node_ref, $episode_source);
-      if($lock != 1) {
-        $node = kued_description_handler($new_guide, $old_guide, $new_description, $old_description, $node);
-      }
-    } else {
-      // Not flagged KUED, but let's check if it needs to be
-      if($episode_source == 'KUED' || $episode_source == 'HNKREP' || $episode_source == 'UCON') {
-        $node = kued_series_handler($node, $node_ref, $episode_source);
-      }
-      // This is not a KUED program, let's check the Guide & Description
-      if($lock != 1) {
-        $node = kued_description_handler($new_guide, $old_guide, $new_description, $old_description, $node);
-      }
-    }
-
-    //Update Episode URL
-    if(strlen($episode_url)) {
-      if(!empty($node->field_episode_url)) {
-        $field_episode_url = $node->field_episode_url[$node->language][0]['url'];
-      } else {
-        $field_episode_url = '';
-      }
-      // Check for differences in the code.  If they're not identical update
-      if(strcmp($field_episode_url, $episode_url) != 0) {
-        $node->field_episode_url[$node->language][0]['url'] = $episode_url;
-        $node->field_episode_url[$node->language][0]['title'] = $episode_title;
-      }
-    }
-    //Update Episode Length
-    if(strlen($episode_length)) {
-      if(!empty($node->field_episode_length)) {
-        $field_episode_length = $node->field_episode_length[$node->language][0]['value'];
-      } else {
-        $field_episode_length = '';
-      }
-      // Check for differences in the code.  If they're not identical update
-      if(strcmp($field_episode_length, $episode_length) != 0) {
-        $node->field_episode_length[$node->language][0]['value'] = $episode_length;
-      }
-    }
-  // End lock check
-  }
-
-	//Update Episode Guide
-	if(strlen($episode_guide)) {
-		if(!empty($node->field_episode_guide)) {
-			$field_episode_guide = $node->field_episode_guide[$node->language][0]['value'];
-		} else {
-			$field_episode_guide = '';
-		}
-		// Check for differences in the code.  If they're not identical update
-		if(strcmp($field_episode_guide, $episode_guide) != 0) {
-			$node->field_episode_guide[$node->language][0]['value'] = $episode_guide;
-			$node->field_episode_guide[$node->language][0]['format'] = 'full_html';
-		}
-	}
-	//Update Episode Description
-	if(strlen($episode_description)) {
-		if(!empty($node->field_episode_description)) {
-			$field_episode_description = $node->field_episode_description[$node->language][0]['value'];
-		} else {
-			$field_episode_description = '';
-		}
-		// Check for differences in the code.  If they're not identical update
-		if(strcmp($field_episode_description, $episode_description) != 0) {
-			$node->field_episode_description[$node->language][0]['value'] = $episode_description;
-			$node->field_episode_description[$node->language][0]['summary'] = text_summary($episode_description);
-			$node->field_episode_description[$node->language][0]['format'] = 'full_html';
-		}
-	}
-	//Update Episode URL
-	if(strlen($episode_url)) {
-		if(!empty($node->field_episode_url)) {
-			$field_episode_url = $node->field_episode_url[$node->language][0]['url'];
-		} else {
-			$field_episode_url = '';
-		}
-			// Check for differences in the code.  If they're not identical update
-		if(strcmp($field_episode_url, $episode_url) != 0) {
-			$node->field_episode_url[$node->language][0]['url'] = $episode_url;
-			$node->field_episode_url[$node->language][0]['title'] = $episode_title;
-		}
-	}
-	//Update Episode Length
-	if(strlen($episode_length)) {
-		if(!empty($node->field_episode_length)) {
-			$field_episode_length = $node->field_episode_length[$node->language][0]['value'];
-		} else {
-			$field_episode_length = '';
-		}
-		// Check for differences in the code.  If they're not identical update
-		if(strcmp($field_episode_length, $episode_length) != 0) {
-			$node->field_episode_length[$node->language][0]['value'] = $episode_length;
-		}
-	}
-	// Insert Version ID(s)
-	if(strlen($episode_version_id)) {
-		$node->	field_version_id[$node->language][]['value'] = $episode_version_id;
-	}
-
-	//dpm($node);
-	// save and close the node
-	if($node = node_submit($node)) { // Prepare node for saving
-			node_save($node);
-			$nid = $node->nid;
-	}
-return $nid;
-}
-*/
-

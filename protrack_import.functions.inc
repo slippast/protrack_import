@@ -1,20 +1,21 @@
 <?php
 // $Id$
+// These functions clean up the messy ProTrack data
 
 /**
- * These functions clean up the messy ProTrack text
+ * Function to clean the MS text that finds its way in here
  */
-
-//Function to clean the MS text that finds its way in here...
 function protrack_import_fix_text($fixed_string) {
 	$ms_bad_characters = array(chr(145), chr(146), chr(147), chr(148), chr(150), chr(151), chr(133)); //Bad boy
 	$ms_good_characters = array("'", "'", '"', '"', '-', '--', '...'); //Much Better
 	$fixed_string = str_replace($ms_bad_characters, $ms_good_characters, $fixed_string); //Replace the nasty stuff now
-	//Send the fix back
+
 	return $fixed_string;
 }
 
-//Function to clean the nasty ProTrack tags from the titles
+/**
+ * Function to clean the nasty ProTrack tags from the titles
+ */
 function protrack_import_fix_title($fixed_string) {
 	$bad_characters = array('{World}', '{Annen}'); //Bad boy
 	$fixed_string = str_replace($bad_characters, '', $fixed_string); //Replace the nasty stuff now
@@ -29,15 +30,13 @@ function protrack_import_fix_title($fixed_string) {
 			$fixed_string = 'The ' . $fixed_string;
 			}
 		}
-	//drupal_set_message('<pre>After<br />'.print_r($fixed_string, TRUE).'</pre><hr />');
 
-
-
-	//Send the fix back
 	return $fixed_string;
 }
 
-//Reverse HTML characters for insert
+/**
+ * Reverse HTML characters for insert
+ */
 function reverse_html($reverse) {
 	$translation = get_html_translation_table(HTML_SPECIALCHARS, ENT_QUOTES);
 	$translation = array_flip($translation);
@@ -50,8 +49,9 @@ function reverse_html($reverse) {
 	return $fixed_string;
 }
 
-
-// Special Title Replacement filter
+/**
+ * Special Title Replacement filter
+ */
 function title_replacement_filter($fixed_string) {
   // This is for one-off title swaps.
   if($fixed_string == 'All-Star Film Collection') {
@@ -60,12 +60,11 @@ function title_replacement_filter($fixed_string) {
 	return $fixed_string;
 }
 
+// Now we use a couple of functions to format the Taxonomy Data because the data coming from ProTrack is ugly
 
 /**
- * Now we use a couple of functions to format the Taxonomy Data because the stuff coming from ProTrack is ugly
+ * Fix the taxonomy for Series entries
  */
-
-//Fix the taxonomy for Series entries
 function series_import_taxonomy_fix($series_program_type) {
 	switch ($series_program_type) {
 		
@@ -169,8 +168,9 @@ function series_import_taxonomy_fix($series_program_type) {
 	return $series_program_type_formatted;
 }
 
-
-//Fix the taxonomy for Episode Stereo type
+/**
+ * Fix the taxonomy for Episode Stereo type
+ */
 function episode_import_stereo_fix($episode_stereo) {
 	switch ($episode_stereo) {
 
@@ -193,7 +193,9 @@ function episode_import_stereo_fix($episode_stereo) {
 	return $episode_stereo_formatted;
 }
 
-//Fix the taxonomy for Episode Letterbox type
+/**
+ * Fix the taxonomy for Episode Letterbox type
+ */
 function episode_import_letterbox_fix($episode_letterbox) {
 	switch ($episode_letterbox) {
 
@@ -224,8 +226,9 @@ function episode_import_letterbox_fix($episode_letterbox) {
 	return $episode_letterbox_formatted;
 }
 
-
-//Fix the taxonomy for Channel
+/**
+ * Fix the taxonomy for Channel
+ */
 function channel_fix($channel) {
 	switch ($channel) {
 

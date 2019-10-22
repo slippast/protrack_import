@@ -13,14 +13,11 @@ dependencies[] = node
 dependencies[] = field
 dependencies[] = number
 dependencies[] = taxonomy
-dependencies[] = references
 dependencies[] = entity
 dependencies[] = entityreference
 dependencies[] = cer
 ;dependencies[] = pathauto
 
-; Information added by drupal.org packaging script on 2011-01-12
 version = "7.x-1.0-dev"
 core = "7.x"
 project = "protrack_import"
-datestamp = "1294805790"

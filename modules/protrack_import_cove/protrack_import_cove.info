@@ -10,7 +10,6 @@ dependencies[] = node
 dependencies[] = field
 dependencies[] = number
 dependencies[] = taxonomy
-dependencies[] = references
 dependencies[] = entity
 dependencies[] = entityreference
 dependencies[] = cer

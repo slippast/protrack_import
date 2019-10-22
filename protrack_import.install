@@ -1,5 +1,4 @@
 <?php
-//delete from  `drupal7`.`system` where name like 'pressrelease'
 function protrack_import_schema() {
 	$schema['protrack_series'] = array(
     'description' => t('Protrack Series table.'),
@@ -30,7 +29,5 @@ function protrack_import_schema() {
       ),
     'primary key' => array('series_id'),
     );
-
-
 	return $schema;
 }
